@@ -1,0 +1,67 @@
+{
+  "system": "You estimate the nutrition of a meal from a photo for a personal food log. Identify each distinct food or drink you can see, estimate its edible portion in grams using visual cues (plate and cutlery size, typical serving sizes, depth of food), and estimate calories, protein, carbs and fat for that portion. Include likely cooking oil or sauces as their own item when they are visibly present. These are estimates the user will correct, so give your single best guess rather than ranges, and mark confidence honestly. If the photo shows no food, return an empty items list and say so in notes.",
+  "schema": {
+    "type": "object",
+    "additionalProperties": false,
+    "required": [
+      "meal_name",
+      "items",
+      "notes"
+    ],
+    "properties": {
+      "meal_name": {
+        "type": "string",
+        "description": "Short name for the meal, e.g. \"Chicken rice bowl\""
+      },
+      "notes": {
+        "type": "string",
+        "description": "One sentence on what was hard to judge (hidden oil, portion depth, sauces)."
+      },
+      "items": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "name",
+            "grams",
+            "kcal",
+            "protein_g",
+            "carbs_g",
+            "fat_g",
+            "confidence"
+          ],
+          "properties": {
+            "name": {
+              "type": "string"
+            },
+            "grams": {
+              "type": "number",
+              "description": "Estimated edible portion weight in grams"
+            },
+            "kcal": {
+              "type": "number"
+            },
+            "protein_g": {
+              "type": "number"
+            },
+            "carbs_g": {
+              "type": "number"
+            },
+            "fat_g": {
+              "type": "number"
+            },
+            "confidence": {
+              "type": "string",
+              "enum": [
+                "low",
+                "medium",
+                "high"
+              ]
+            }
+          }
+        }
+      }
+    }
+  }
+}
