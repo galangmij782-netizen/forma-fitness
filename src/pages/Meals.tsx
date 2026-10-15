@@ -1,6 +1,7 @@
 import { AnimatePresence, motion } from 'motion/react'
-import { Camera, ChevronLeft, ChevronRight, Flame, ImagePlus, KeyRound, Pencil, Plus, Search, Sparkles, Star, Trash2, X } from 'lucide-react'
+import { Camera, ScanBarcode, ChevronLeft, ChevronRight, Flame, ImagePlus, KeyRound, Pencil, Plus, Search, Sparkles, Star, Trash2, X } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
+import { BarcodeScanner } from '../components/BarcodeScanner'
 import { useCelebrate } from '../components/Celebrate'
 import { Ring } from '../components/Ring'
 import { Bar, Button, Card, CountUp, Empty, IconButton, PageHeader, Sheet, Skeleton, rise, softSpring, spring, stagger, useToast } from '../components/ui'
@@ -11,13 +12,14 @@ import { useNav, useSession } from '../lib/nav'
 import { platform } from '../lib/platform'
 import { dayTotals, deleteMeal, favoriteFoods, mealsOn, recentFoods, saveFood, saveMeal, searchFoods, toggleFavorite } from '../lib/repo'
 import type { Food, Meal, MealItem } from '../lib/types'
+import type { Product } from '../lib/barcode'
 
 const sum = (items: MealItem[], k: keyof Pick<MealItem, 'kcal' | 'protein' | 'carbs' | 'fat'>) => items.reduce((a, i) => a + (Number(i[k]) || 0), 0)
 
 export function Meals() {
   const { params } = useNav()
   const [date, setDate] = useState(today())
-  const [mode, setMode] = useState<null | 'photo' | 'manual' | { edit: Meal }>((params.add as 'photo') ?? null)
+  const [mode, setMode] = useState<null | 'photo' | 'manual' | 'scan' | { edit: Meal }>((params.add as 'photo') ?? null)
   const meals = useQuery(() => mealsOn(date), [date])
   const totals = useDayTotals(date)
   const t = useTargets()
@@ -34,6 +36,7 @@ export function Meals() {
         </span>}
         actions={<>
           <Button onClick={() => setMode('manual')}><Plus size={16} /> Add manually</Button>
+          <Button onClick={() => setMode('scan')}><ScanBarcode size={16} /> Scan barcode</Button>
           <Button variant="primary" onClick={() => setMode('photo')}><Camera size={16} /> Add from photo</Button>
         </>} />
 
@@ -85,7 +88,7 @@ export function Meals() {
       )}
 
       <Sheet open={mode === 'photo'} onClose={() => setMode(null)} xwide title="Meal from a photo"><PhotoFlow date={date} onDone={() => setMode(null)} /></Sheet>
-      <Sheet open={mode === 'manual'} onClose={() => setMode(null)} xwide title="Add a meal"><ManualFlow date={date} onDone={() => setMode(null)} /></Sheet>
+      <Sheet open={mode === 'manual' || mode === 'scan'} onClose={() => setMode(null)} xwide title="Add a meal"><ManualFlow date={date} scan={mode === 'scan'} onDone={() => setMode(null)} /></Sheet>
       <Sheet open={typeof mode === 'object' && mode !== null} onClose={() => setMode(null)} xwide title="Edit meal">
         {typeof mode === 'object' && mode !== null && <MealEditor date={date} initial={mode.edit} onDone={() => setMode(null)} />}
       </Sheet>
@@ -207,18 +210,34 @@ function PhotoFlow({ date, onDone }: { date: string; onDone: () => void }) {
 }
 
 // ---------- manual ----------
-function ManualFlow({ date, onDone }: { date: string; onDone: () => void }) {
+function ManualFlow({ date, onDone, scan }: { date: string; onDone: () => void; scan?: boolean }) {
+  const toast = useToast()
   const [q, setQ] = useState('')
+  const [scanning, setScanning] = useState(!!scan)
   const [incoming, setIncoming] = useState<{ item: MealItem; n: number } | null>(null)
   const foods = useQuery(() => (q ? searchFoods(q) : null), [q])
   const recent = useQuery(() => recentFoods(), [])
   const favs = useQuery(() => favoriteFoods(), [])
   const add = (f: Food) => setIncoming({ n: Date.now(), item: { name: f.name, grams: f.grams, base_grams: f.grams, kcal: f.kcal, protein: f.protein, carbs: f.carbs, fat: f.fat, food_id: f.id } })
+  const found = (p: Product) => {
+    saveFood({ name: p.item.name, grams: p.item.grams, kcal: p.item.kcal, protein: p.item.protein, carbs: p.item.carbs, fat: p.item.fat })
+    setIncoming({ n: Date.now(), item: { ...p.item } })
+    setScanning(false)
+    toast({ icon: <ScanBarcode size={14} />, title: p.name, body: `Added ${Math.round(p.item.grams)} g · ${p.item.kcal} kcal. Adjust grams if needed.` })
+  }
   const list = foods ?? [...(favs ?? []), ...(recent ?? []).filter((r) => !favs?.some((f) => f.id === r.id))]
 
   return (
     <div className="grid stack-md" style={{ gridTemplateColumns: '300px 1fr', gap: 24, alignItems: 'start' }}>
       <div className="col" style={{ gap: 10 }}>
+        <AnimatePresence initial={false}>
+          {scanning && (
+            <motion.div key="scan" initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }} transition={softSpring}>
+              <BarcodeScanner onFound={found} />
+            </motion.div>
+          )}
+        </AnimatePresence>
+        <Button size="sm" variant={scanning ? 'ghost' : undefined} onClick={() => setScanning((v) => !v)}><ScanBarcode size={14} /> {scanning ? 'Close scanner' : 'Scan a barcode'}</Button>
         <div style={{ position: 'relative' }}>
           <Search size={15} className="faint" style={{ position: 'absolute', left: 12, top: 12 }} />
           <input className="input" placeholder="Search saved foods" value={q} onChange={(e) => setQ(e.target.value)} style={{ paddingLeft: 36 }} />

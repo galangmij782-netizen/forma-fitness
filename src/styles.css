@@ -285,3 +285,14 @@ table.clean td { padding: 8px; border-top: 1px solid var(--hairline); }
   .macro-grid { grid-template-columns: repeat(3, minmax(0, 1fr)) !important; }
   .keep-3 { grid-template-columns: repeat(3, minmax(0, 1fr)) !important; }
 }
+
+/* barcode scanner */
+.scan-view { position: relative; height: 210px; border-radius: 16px; overflow: hidden; background: #08090a; border: 1px solid var(--hairline); }
+.scan-view video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.scan-frame { position: absolute; left: 50%; top: 50%; width: 72%; height: 110px; transform: translate(-50%, -50%); border-radius: 14px; box-shadow: 0 0 0 999px rgba(0,0,0,.38); border: 1.5px solid rgba(255,255,255,.7); }
+.scan-line { position: absolute; left: 10px; right: 10px; top: 6px; height: 2px; border-radius: 2px; background: var(--accent); box-shadow: 0 0 12px var(--accent); }
+.scan-empty { position: absolute; inset: 0; align-items: center; justify-content: center; gap: 8px; text-align: center; padding: 20px; color: rgba(255,255,255,.7); }
+.scan-badge { position: absolute; left: 50%; bottom: 12px; transform: translateX(-50%); padding: 6px 12px; border-radius: 999px; background: rgba(0,0,0,.65); color: #fff; white-space: nowrap; }
+.spin { animation: spin 0.9s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .spin { animation-duration: 2.4s; } }

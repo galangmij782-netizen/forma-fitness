@@ -1,6 +1,6 @@
 // Electron main process: window, local profiles, file-backed SQLite storage,
 // encrypted API key storage and the Claude photo analysis call.
-const { app, BrowserWindow, ipcMain, dialog, safeStorage, nativeTheme, shell } = require('electron')
+const { app, BrowserWindow, ipcMain, dialog, safeStorage, nativeTheme, shell, session } = require('electron')
 const path = require('node:path')
 const fs = require('node:fs')
 const crypto = require('node:crypto')
@@ -219,6 +219,8 @@ ipcMain.on('theme:set', (e, mode) => {
 })
 
 app.whenReady().then(() => {
+  // Camera for barcode scanning is the only permission the app asks for.
+  session.defaultSession.setPermissionRequestHandler((_wc, permission, cb) => cb(permission === 'media'))
   createWindow()
   app.on('activate', () => { if (BrowserWindow.getAllWindows().length === 0) createWindow() })
 })
