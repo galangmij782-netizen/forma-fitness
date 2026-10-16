@@ -1,6 +1,6 @@
 import { AnimatePresence, LayoutGroup, Reorder, motion, useDragControls } from 'motion/react'
 import { ArrowLeft, Check, ClipboardType, Copy, GripVertical, Plus, Search, Star, Trash2, X } from 'lucide-react'
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { Button, Empty, IconButton, PageHeader, Sheet, Stepper, rise, softSpring, spring, stagger } from '../components/ui'
 import { useQuery } from '../lib/db'
 import { useNav } from '../lib/nav'
@@ -120,7 +120,11 @@ function ProgramSheet({ open, onClose, onCreated }: { open: boolean; onClose: ()
   const program = useMemo(() => parseProgram(text), [text])
   const days = program.days.map((d) => ({ ...d, exercises: d.exercises.map((e) => ({ ...e, muscle: muscles[e.name] ?? e.muscle })) }))
   const count = days.reduce((a, d) => a + d.exercises.length, 0)
+  const busy = useRef(false)
   const create = () => {
+    if (busy.current) return
+    busy.current = true
+    setTimeout(() => { busy.current = false }, 1000)
     const id = createSplitFromProgram(name.trim() || program.title || (days.length > 1 ? days.map((d) => d.name).join(' / ') : 'My program'), days)
     if (makeActive) saveProfile({ active_split_id: id })
     setText(''); setName(''); setMuscles({})

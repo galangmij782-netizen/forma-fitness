@@ -90,6 +90,12 @@ export function parseProgram(text: string): Program {
   for (const line of lines) {
     const sr = readSetsReps(line)
     if (!sr) {
+      // "Rest: 2-3 min" on its own line belongs to the exercise above it.
+      const lastDay = days[days.length - 1], lastEx = lastDay?.exercises[lastDay.exercises.length - 1]
+      const rest = readRest(line)
+      if (rest && lastEx && !pendingHeaders.length && line.length < 40) { lastEx.rest = rest.secs; lastEx.restGiven = true; continue }
+      // Coaching notes are not day names.
+      if (lastEx && !pendingHeaders.length && /^(notes?|tips?|cues?|focus|tempo|warm[ -]?up|cool[ -]?down|rpe|rir|progression|superset)\b/i.test(line)) continue
       // A header: strip "Day 1:" style prefixes but keep the useful part ("Day 1 - Push" -> "Push").
       const h = line.replace(/[:\-–—]+\s*$/, '').trim()
       pendingHeaders.push(h)
@@ -112,5 +118,14 @@ export function parseProgram(text: string): Program {
       rest: rest?.secs ?? defaultRest(name, sr.max), restGiven: !!rest, line,
     })
   }
-  return { title, days: days.filter((d) => d.exercises.length) }
+  // Programs written week by week repeat the same day ("Week 1 ... Lower A ... Week 2 ... Lower A").
+  // A split day is a template, so keep the first one of each name.
+  const seen = new Set<string>()
+  const unique = days.filter((d) => {
+    if (!d.exercises.length) return false
+    const key = d.name.toLowerCase().replace(/[^a-z0-9]/g, '')
+    if (seen.has(key)) return false
+    seen.add(key); return true
+  })
+  return { title, days: unique }
 }

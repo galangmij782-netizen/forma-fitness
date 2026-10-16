@@ -24,3 +24,31 @@ Calf raises 4x15`)
     expect(l.exercises.map((e) => e.muscle)).toEqual(['Quads', 'Hamstrings', 'Quads', 'Calves'])
   })
 })
+
+describe('week-by-week programs', () => {
+  it('keeps one of each day and reads rest lines', () => {
+    const p = parseProgram(`Week 1
+Upper A
+Bench press 4 x 6
+Rest: 2-3 min
+Row 3x10
+Lower A
+Squat 4x5
+Notes: brace hard
+Leg curl 3x12
+Week 2
+Upper A
+Bench press 4 x 5
+Row 3x10
+Lower A
+Squat 4x4
+Leg curl 3x12
+Week 3
+Lower A
+Squat 5x3`)
+    expect(p.days.map((d) => d.name)).toEqual(['Upper A', 'Lower A'])
+    expect(p.days[0].exercises.map((e) => e.name)).toEqual(['Bench Press', 'Row'])
+    expect(p.days[0].exercises[0].rest).toBe(120)
+    expect(p.days[1].exercises.map((e) => e.name)).toEqual(['Back Squat', 'Leg Curl'])
+  })
+})
