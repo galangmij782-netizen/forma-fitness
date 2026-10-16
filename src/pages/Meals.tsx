@@ -77,7 +77,7 @@ export function Meals() {
         <motion.div className="col" style={{ gap: 12 }} variants={stagger}>
           <AnimatePresence initial={false}>
             {meals.map((m) => (
-              <motion.div key={m.id} layout variants={rise} exit={{ opacity: 0, scale: 0.98 }} className="card meal-row" style={{ padding: 18, display: 'flex', gap: 18, alignItems: 'center' }} whileHover={{ y: -2 }} transition={spring}>
+              <motion.div key={m.id} layout="position" variants={rise} exit={{ opacity: 0, scale: 0.98 }} className="card meal-row" style={{ padding: 18, display: 'flex', gap: 18, alignItems: 'center' }} whileHover={{ y: -2 }} transition={spring}>
                 {m.photo ? <img src={m.photo} alt="" style={{ width: 64, height: 64, borderRadius: 14, objectFit: 'cover' }} />
                   : <div style={{ width: 64, height: 64, borderRadius: 14, background: 'var(--track)', display: 'grid', placeItems: 'center', color: 'var(--text-3)' }}><Flame size={20} /></div>}
                 <div className="grow">
@@ -436,7 +436,7 @@ function MealEditor({ date, initial, notes, onDone, reveal, manual, incoming }: 
       <motion.div className="col" style={{ gap: 6 }} variants={stagger} initial={reveal ? 'hidden' : false} animate="show">
         <AnimatePresence initial={false}>
           {items.map((it, i) => (
-            <motion.div key={i} variants={rise} layout exit={{ opacity: 0, x: -10 }} className="row wrap-md meal-item" style={{ gap: 8, padding: '6px 4px', borderRadius: 12 }}>
+            <motion.div key={i} variants={rise} layout="position" exit={{ opacity: 0, x: -10 }} className="row wrap-md meal-item" style={{ gap: 8, padding: '6px 4px', borderRadius: 12 }}>
               <div className="grow row" style={{ gap: 6, minWidth: 0, flexBasis: 180 }}>
                 <input className="input sm" style={{ minWidth: 0 }} value={it.name} placeholder="Food name" onChange={(e) => update(i, { name: e.target.value })} />
                 {it.confidence && <span className={`chip ${it.confidence === 'low' ? 'warn' : ''}`} style={{ height: 22, flex: 'none' }} title="How sure the estimate is">{it.confidence}</span>}
@@ -456,7 +456,7 @@ function MealEditor({ date, initial, notes, onDone, reveal, manual, incoming }: 
         <Button size="sm" variant="ghost" onClick={() => setItems((x) => [...x, { name: '', grams: 100, kcal: 0, protein: 0, carbs: 0, fat: 0 }])}><Plus size={14} /> Custom item</Button>
         {items.length > 0 && <Button size="sm" variant="ghost" onClick={() => { items.filter((i) => i.name.trim()).forEach((i) => saveFood({ name: i.name.trim(), grams: i.grams, kcal: i.kcal, protein: i.protein, carbs: i.carbs, fat: i.fat })); toast({ title: 'Saved to favorites' }) }}><Star size={14} /> Save foods as favorites</Button>}
       </div>
-      <motion.div layout className="card flat pad-sm row between wrap-md" style={{ background: 'var(--surface)' }}>
+      <motion.div layout="position" className="card flat pad-sm row between wrap-md" style={{ background: 'var(--surface)' }}>
         <div className="row num" style={{ gap: 22 }}>
           <span><span className="t-lg w-600"><CountUp value={Math.round(totals.kcal)} duration={0.5} /></span> <span className="t-sm faint">kcal</span></span>
           <span className="t-sm muted">P <span className="w-600" style={{ color: 'var(--text)' }}>{Math.round(totals.protein)}</span> g</span>

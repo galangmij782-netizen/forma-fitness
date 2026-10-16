@@ -180,7 +180,7 @@ function Body() {
         <motion.div className="col" style={{ gap: 0, maxHeight: 280, overflow: 'auto' }}>
           <AnimatePresence initial={false}>
             {[...entries].reverse().slice(0, 30).map((e) => (
-              <motion.div key={e.id} layout initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="list-row" style={{ padding: '6px 4px' }}>
+              <motion.div key={e.id} layout="position" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="list-row" style={{ padding: '6px 4px' }}>
                 <span className="grow t-sm muted">{fmtDay(e.date)}</span>
                 <span className="t-sm num w-500">{u.fmt(e.kg)}</span>
                 <IconButton label="Delete entry" className="sm" onClick={() => deleteWeight(e.id)}><Trash2 size={13} /></IconButton>

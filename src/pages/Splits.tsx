@@ -1,4 +1,4 @@
-import { AnimatePresence, LayoutGroup, Reorder, motion, useDragControls } from 'motion/react'
+import { AnimatePresence, Reorder, motion, useDragControls } from 'motion/react'
 import { ArrowLeft, Check, ClipboardType, Copy, GripVertical, Plus, Search, Star, Trash2, X } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Button, Empty, IconButton, PageHeader, Sheet, Stepper, rise, softSpring, spring, stagger } from '../components/ui'
@@ -11,7 +11,6 @@ import {
 import { parseProgram } from '../lib/programText'
 import { MUSCLE_GROUPS, type DayExercise, type MuscleGroup, type SplitDay } from '../lib/types'
 
-const layoutT = { type: 'spring', stiffness: 300, damping: 34, mass: 0.9 } as const
 
 export function Splits() {
   const { params } = useNav()
@@ -21,6 +20,7 @@ export function Splits() {
   const daysBySplit = useQuery(() => Object.fromEntries((splits ?? []).map((s) => [s.id, listDays(s.id)])), [splits])
   const [creating, setCreating] = useState(false)
   const [typing, setTyping] = useState(!!params.type)
+  useEffect(() => { document.querySelector('.page')?.scrollTo({ top: 0 }) }, [selected])
   useEffect(() => {
     const open = () => setTyping(true)
     window.addEventListener('forma:type-program', open)
@@ -30,9 +30,9 @@ export function Splits() {
 
   return (
     <div className="page-inner">
-      <LayoutGroup id="splits">
+      <AnimatePresence mode="wait" initial={false}>
         {selected === null ? (
-          <motion.div key="grid" variants={stagger} initial="hidden" animate="show">
+          <motion.div key="grid" variants={stagger} initial="hidden" animate="show" exit={{ opacity: 0, x: -16, transition: { duration: 0.14, ease: 'easeIn' } }}>
             <PageHeader title="Splits" sub="Plan the days you train and what each one includes."
               actions={<>
                 <Button onClick={() => setCreating(true)}><Plus size={16} /> Templates</Button>
@@ -43,14 +43,14 @@ export function Splits() {
             ) : (
               <div className="grid g-3">
                 {splits.map((s) => (
-                  <motion.div key={s.id} layoutId={`split-${s.id}`} transition={layoutT} variants={rise}
+                  <motion.div key={s.id} variants={rise}
                     whileHover={{ y: -4 }} whileTap={{ scale: 0.985 }}
                     className="card interactive" style={{ minHeight: 196, display: 'flex', flexDirection: 'column', borderRadius: 20 }}
                     onClick={() => setSelected(s.id)}>
-                    <motion.div layout="position" className="row between" style={{ marginBottom: 10 }}>
-                      <motion.div layoutId={`split-title-${s.id}`} transition={layoutT} className="t-lg w-600" style={{ letterSpacing: '-0.02em' }}>{s.name}</motion.div>
-                      {activeId === s.id && <span className="chip accent"><Star size={11} fill="currentColor" /> Active</span>}
-                    </motion.div>
+                    <div className="row between" style={{ marginBottom: 10, gap: 8 }}>
+                      <div className="t-lg w-600" style={{ letterSpacing: '-0.02em', minWidth: 0 }}>{s.name}</div>
+                      {activeId === s.id && <span className="chip accent" style={{ flex: 'none' }}><Star size={11} fill="currentColor" /> Active</span>}
+                    </div>
                     <p className="t-sm muted" style={{ marginBottom: 'auto' }}>{s.description || 'No description'}</p>
                     <div className="row wrap" style={{ gap: 6, marginTop: 18 }}>
                       {daysBySplit[s.id]?.map((d) => <span key={d.id} className="chip">{d.name}</span>)}
@@ -64,7 +64,7 @@ export function Splits() {
         ) : (
           <SplitDetail key={`d${selected}`} id={selected} onBack={() => setSelected(null)} />
         )}
-      </LayoutGroup>
+      </AnimatePresence>
       <ProgramSheet open={typing} onClose={() => setTyping(false)} onCreated={(id) => { setTyping(false); setSelected(id) }} />
       <NewSplitSheet open={creating} onClose={() => setCreating(false)} onCreated={(id) => { setCreating(false); setSelected(id) }} />
     </div>
@@ -116,17 +116,23 @@ function ProgramSheet({ open, onClose, onCreated }: { open: boolean; onClose: ()
   const [text, setText] = useState('')
   const [name, setName] = useState('')
   const [makeActive, setMakeActive] = useState(true)
+  const existing = useQuery(() => ({ splits: listSplits(), active: getProfile().active_split_id }), [open])
+  const [mode, setMode] = useState<'replace' | 'new'>('replace')
   const [muscles, setMuscles] = useState<Record<string, MuscleGroup>>({})
   const program = useMemo(() => parseProgram(text), [text])
   const days = program.days.map((d) => ({ ...d, exercises: d.exercises.map((e) => ({ ...e, muscle: muscles[e.name] ?? e.muscle })) }))
   const count = days.reduce((a, d) => a + d.exercises.length, 0)
   const busy = useRef(false)
+  const finalName = name.trim() || program.title || 'My program'
+  // The split this one replaces: one with the same name, otherwise the active split.
+  const target = existing?.splits.find((x) => x.name.trim().toLowerCase() === finalName.toLowerCase()) ?? existing?.splits.find((x) => x.id === existing.active)
   const create = () => {
     if (busy.current) return
     busy.current = true
     setTimeout(() => { busy.current = false }, 1000)
-    const id = createSplitFromProgram(name.trim() || program.title || (days.length > 1 ? days.map((d) => d.name).join(' / ') : 'My program'), days)
-    if (makeActive) saveProfile({ active_split_id: id })
+    const id = createSplitFromProgram(finalName, days)
+    if (target && mode === 'replace') deleteSplit(target.id)
+    if (makeActive || (target && mode === 'replace' && target.id === existing?.active)) saveProfile({ active_split_id: id })
     setText(''); setName(''); setMuscles({})
     onCreated(id)
   }
@@ -134,15 +140,15 @@ function ProgramSheet({ open, onClose, onCreated }: { open: boolean; onClose: ()
     <Sheet open={open} onClose={onClose} xwide title="Type your program">
       <div className="grid stack-md" style={{ gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 1fr)', gap: 24, alignItems: 'start' }}>
         <div className="col" style={{ gap: 10 }}>
-          <input className="input" placeholder={program.title ?? 'Split name (optional)'} value={name} onChange={(e) => setName(e.target.value)} />
+          <input className="input" placeholder={program.title ?? 'Split name, e.g. My Upper / Lower'} value={name} onChange={(e) => setName(e.target.value)} />
           <textarea className="input program-text" autoFocus value={text} onChange={(e) => setText(e.target.value)} placeholder={EXAMPLE} spellCheck={false} />
           <div className="t-xs faint">One exercise per line with sets and reps, like <b>3x8-12</b> or <b>4 sets of 10</b>. Put a day name (Push, Day 1, Monday) on its own line before its exercises. Add <b>rest 90s</b> to set the rest, or I'll pick one.</div>
         </div>
         <div className="col" style={{ gap: 12 }}>
           {!count && <div className="card flat pad-sm t-sm muted">Your split will appear here as you type.</div>}
           {days.map((d, i) => (
-            <motion.div key={i} layout className="card flat pad-sm" style={{ background: 'var(--surface)' }}>
-              <div className="row between" style={{ marginBottom: 8 }}><span className="w-600">{d.name}{d.weekdays?.length ? <span className="t-xs accent" style={{ marginLeft: 8 }}>{d.weekdays.map((w) => WEEKDAYS[w]).join(', ')}</span> : null}</span><span className="t-xs faint">{d.exercises.length} exercises · {d.exercises.reduce((a, e) => a + e.sets, 0)} sets</span></div>
+            <div key={i} className="card flat pad-sm" style={{ background: 'var(--surface)' }}>
+              <div className="row between" style={{ marginBottom: 8 }}><span className="w-600">{d.name}{d.weekdays?.length ? <span className="t-xs accent" style={{ marginLeft: 8 }}>{d.weekdays.map((w) => WEEKDAYS[w]).join(', ')}</span> : null}</span><span className="t-xs faint">{d.exercises.length} exercise{d.exercises.length === 1 ? '' : 's'} · {d.exercises.reduce((a, e) => a + e.sets, 0)} sets</span></div>
               <div className="col" style={{ gap: 6 }}>
                 {d.exercises.map((e, j) => (
                   <div key={j} className="row" style={{ gap: 8 }}>
@@ -156,12 +162,18 @@ function ProgramSheet({ open, onClose, onCreated }: { open: boolean; onClose: ()
                   </div>
                 ))}
               </div>
-            </motion.div>
+            </div>
           ))}
           {count > 0 && (
             <>
+              {target && (
+                <div className="col" style={{ gap: 6 }}>
+                  <label className="row t-sm" style={{ gap: 8 }}><input type="radio" checked={mode === 'replace'} onChange={() => setMode('replace')} /> Replace "{target.name}" (your workout history stays)</label>
+                  <label className="row t-sm" style={{ gap: 8 }}><input type="radio" checked={mode === 'new'} onChange={() => setMode('new')} /> Keep it and add this as another split</label>
+                </div>
+              )}
               <label className="row t-sm" style={{ gap: 8 }}><input type="checkbox" checked={makeActive} onChange={(e) => setMakeActive(e.target.checked)} /> Make this my active split</label>
-              <Button variant="primary" size="lg" onClick={create}>Create split · {days.length} day{days.length > 1 ? 's' : ''}, {count} exercises</Button>
+              <Button variant="primary" size="lg" onClick={create}>{target && mode === 'replace' ? 'Save split' : 'Create split'} · {days.length} day{days.length > 1 ? 's' : ''}, {count} exercises</Button>
             </>
           )}
         </div>
@@ -183,8 +195,9 @@ function SplitDetail({ id, onBack }: { id: number; onBack: () => void }) {
   const dayMap = new Map(days.map((d) => [d.id, d]))
 
   return (
-    <motion.div layoutId={`split-${id}`} transition={layoutT} className="card split-detail" style={{ padding: 32, borderRadius: 28, minHeight: 'calc(100vh - 120px)' }}>
-      <motion.div layout="position" className="row between wrap-md" style={{ marginBottom: 20 }}>
+    <motion.div className="card split-detail" style={{ padding: 32, borderRadius: 28 }}
+      initial={{ opacity: 0, x: 24 }} animate={{ opacity: 1, x: 0, transition: softSpring }} exit={{ opacity: 0, x: 16, transition: { duration: 0.14, ease: 'easeIn' } }}>
+      <div className="row between wrap-md" style={{ marginBottom: 20 }}>
         <Button variant="ghost" size="sm" onClick={onBack} style={{ marginLeft: -10 }}><ArrowLeft size={15} /> All splits</Button>
         <motion.div className="row" style={{ gap: 6 }} initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.15 }}>
           {active ? <span className="chip accent"><Star size={11} fill="currentColor" /> Active split</span>
@@ -194,10 +207,10 @@ function SplitDetail({ id, onBack }: { id: number; onBack: () => void }) {
             ? <Button size="sm" variant="danger" onClick={() => { if (active) saveProfile({ active_split_id: null }); deleteSplit(id); onBack() }}>Delete for good?</Button>
             : <IconButton label="Delete split" onClick={() => setConfirmDelete(true)}><Trash2 size={16} /></IconButton>}
         </motion.div>
-      </motion.div>
-      <motion.div layoutId={`split-title-${id}`} transition={layoutT} style={{ display: 'inline-block' }}>
+      </div>
+      <div>
         <input className="input bare page-title" value={split.name} onChange={(e) => updateSplit(id, { name: e.target.value })} style={{ width: Math.max(8, split.name.length + 1) + 'ch', maxWidth: '100%' }} />
-      </motion.div>
+      </div>
       <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ ...softSpring, delay: 0.12 }}>
         <input className="input bare muted" placeholder="Add a short description" value={split.description} onChange={(e) => updateSplit(id, { description: e.target.value })} style={{ marginTop: 6, width: '100%' }} />
         <div className="divider" style={{ margin: '24px 0' }} />

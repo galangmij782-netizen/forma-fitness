@@ -102,7 +102,7 @@ function HistoryRow({ s, fmt }: { s: ReturnType<typeof listSessions>[number]; fm
   const groups = new Map<number, SetRow[]>()
   sets?.forEach((x) => { if (!groups.has(x.exercise_id)) groups.set(x.exercise_id, []); groups.get(x.exercise_id)!.push(x) })
   return (
-    <motion.div variants={rise} className="card flat pad-sm" layout transition={spring}>
+    <motion.div variants={rise} className="card flat pad-sm">
       <button className="row" style={{ width: '100%', textAlign: 'left' }} onClick={() => setOpen(!open)}>
         <div style={{ width: 92, flex: 'none' }} className="t-sm muted">{fmtDay(s.date)}</div>
         <div className="grow w-600 t-sm">{s.day_name} <span className="faint w-500">· {s.split_name}</span></div>
@@ -239,7 +239,7 @@ function ExerciseLog({ sessionId, e, logged, running, setRunning }: { sessionId:
       </div>
       <div className="row set-actions" style={{ marginTop: 10, gap: 8 }}>
         {(!complete || mine) && (
-          <motion.button layout className={`btn ${mine ? 'set-running' : 'primary'} grow`} whileTap={{ scale: 0.97 }} transition={spring} onClick={mine ? finishSet : startSet}>
+          <motion.button className={`btn ${mine ? 'set-running' : 'primary'} grow`} whileTap={{ scale: 0.97 }} transition={spring} onClick={mine ? finishSet : startSet}>
             {mine
               ? <><Square size={15} fill="currentColor" /> Finish set {mine.idx + 1} <span className="num" style={{ marginLeft: 'auto' }}>{clock(Math.floor((now - mine.startedAt) / 1000))}</span></>
               : <><Play size={15} fill="currentColor" /> Start set {nextIdx + 1}</>}
@@ -265,7 +265,7 @@ function SetLine({ idx, logged, prev, lastLogged, target, step, toDisplay, onLog
   const missed = logged && logged.reps < target[0]
 
   return (
-    <motion.div layout className="row" style={{ gap: 12, padding: '6px', borderRadius: 12, background: isDone ? 'var(--accent-soft)' : 'transparent', boxShadow: active ? 'inset 0 0 0 1.5px var(--accent)' : 'none', transition: 'background-color .25s, box-shadow .25s' }}>
+    <motion.div className="row" style={{ gap: 12, padding: '6px', borderRadius: 12, background: isDone ? 'var(--accent-soft)' : 'transparent', boxShadow: active ? 'inset 0 0 0 1.5px var(--accent)' : 'none', transition: 'background-color .25s, box-shadow .25s' }}>
       <span className="num w-600 t-sm" style={{ width: 34, textAlign: 'center', color: isDone ? 'var(--accent)' : 'var(--text-3)' }}>{idx + 1}</span>
       <span className="t-sm faint num hide-md" style={{ width: 96 }}>{prev ? `${+toDisplay(prev.weight).toFixed(1)} × ${prev.reps}` : '—'}</span>
       <input className="input sm num" style={{ width: 110 }} value={w} disabled={isDone} inputMode="decimal" onChange={(e) => setW(e.target.value.replace(/[^0-9.,]/g, ''))} onKeyDown={(e) => e.key === 'ArrowUp' ? setW(String(+(parseFloat(w || '0') + step).toFixed(2))) : e.key === 'ArrowDown' ? setW(String(Math.max(0, +(parseFloat(w || '0') - step).toFixed(2)))) : null} />

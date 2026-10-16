@@ -131,11 +131,11 @@ function Shell() {
           </div>
         </aside>
         <main className="main">
-          <AnimatePresence mode="popLayout" initial={false}>
+          <AnimatePresence mode="wait" initial={false}>
             <motion.div key={page} className="page"
-              initial={{ opacity: 0, y: 18, scale: 0.992 }}
-              animate={{ opacity: 1, y: 0, scale: 1, transition: { type: 'spring', stiffness: 260, damping: 30, mass: 0.9 } }}
-              exit={{ opacity: 0, y: -8, scale: 0.996, transition: { duration: 0.14, ease: 'easeIn' } }}>
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0, transition: { type: 'spring', stiffness: 320, damping: 34, mass: 0.8 } }}
+              exit={{ opacity: 0, transition: { duration: 0.1, ease: 'easeIn' } }}>
               <Page />
             </motion.div>
           </AnimatePresence>
