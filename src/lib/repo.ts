@@ -88,11 +88,19 @@ export function createSplitFromProgram(name: string, days: ProgramDay[]): number
   const pos = get<{ m: number }>('SELECT COALESCE(MAX(position), -1) + 1 AS m FROM splits')?.m ?? 0
   return tx((exec) => {
     const sid = exec('INSERT INTO splits(name, description, position, created_at) VALUES(?, ?, ?, ?)', [name, '', pos, new Date().toISOString()])
+    const dayIds: number[] = []
     days.forEach((d, i) => {
       const did = exec('INSERT INTO split_days(split_id, name, position) VALUES(?, ?, ?)', [sid, d.name, i])
       d.exercises.forEach((e, j) =>
         exec('INSERT INTO day_exercises(day_id, exercise_id, position, sets, reps_min, reps_max, rest_sec) VALUES(?,?,?,?,?,?,?)', [did, ids[i][j], j, e.sets, e.repsMin, e.repsMax, e.rest]))
+      dayIds.push(did)
     })
+    if (days.some((d) => d.weekdays?.length)) {
+      for (let w = 0; w < 7; w++) {
+        const i = days.findIndex((d) => d.weekdays?.includes(w))
+        exec('INSERT INTO split_schedule(split_id, weekday, day_id) VALUES(?, ?, ?)', [sid, w, i >= 0 ? dayIds[i] : null])
+      }
+    }
     return sid
   })
 }
@@ -178,9 +186,78 @@ export const trainedExercises = () => all<Exercise & { sessions: number; last: s
   JOIN sets x ON x.exercise_id = e.id JOIN sessions s ON s.id = x.session_id GROUP BY e.id ORDER BY sessions DESC, e.name`)
 
 /** The split day that comes after the most recently trained one. */
+// ---------- weekly schedule (weekday 0 = Monday) ----------
+export const WEEKDAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'] as const
+export const weekdayOf = (d = new Date()) => (d.getDay() + 6) % 7
+
+/** Seven day ids (null = rest), or null when the split has no schedule and just rotates. */
+export function getSchedule(splitId: number): (number | null)[] | null {
+  const rows = all<{ weekday: number; day_id: number | null }>('SELECT weekday, day_id FROM split_schedule WHERE split_id = ?', [splitId])
+  if (!rows.length) return null
+  const week: (number | null)[] = Array(7).fill(null)
+  rows.forEach((r) => { if (r.weekday >= 0 && r.weekday < 7) week[r.weekday] = r.day_id })
+  return week
+}
+
+export function setScheduleDay(splitId: number, weekday: number, dayId: number | null) {
+  tx((exec) => {
+    for (let w = 0; w < 7; w++) exec('INSERT OR IGNORE INTO split_schedule(split_id, weekday, day_id) VALUES(?, ?, NULL)', [splitId, w])
+    exec('UPDATE split_schedule SET day_id = ? WHERE split_id = ? AND weekday = ?', [dayId, splitId, weekday])
+    return 0
+  })
+}
+
+export const clearSchedule = (splitId: number) => run('DELETE FROM split_schedule WHERE split_id = ?', [splitId])
+
+/** What the schedule says for a date: a day, a rest day, or nothing (no schedule). */
+export function scheduledFor(splitId: number, date = new Date()): { scheduled: boolean; day?: SplitDay; rest: boolean } {
+  const week = getSchedule(splitId)
+  if (!week) return { scheduled: false, rest: false }
+  const id = week[weekdayOf(date)]
+  const day = id ? listDays(splitId).find((d) => d.id === id) : undefined
+  return { scheduled: true, day, rest: !day }
+}
+
+// ---------- training calendar ----------
+export type DayMark = { date: string; status: 'skipped' | 'rest'; note: string }
+export type CalState = 'done' | 'missed' | 'skipped' | 'rest' | 'planned' | 'today' | 'none'
+export interface CalDay { date: string; planned?: string; plannedDayId?: number; restPlanned: boolean; sessions: string[]; mark?: DayMark; state: CalState }
+
+export const setMark = (date: string, status: DayMark['status'] | null, note = '') =>
+  status ? run('INSERT INTO day_marks(date, status, note) VALUES(?, ?, ?) ON CONFLICT(date) DO UPDATE SET status = excluded.status, note = excluded.note', [date, status, note.trim()])
+    : run('DELETE FROM day_marks WHERE date = ?', [date])
+
+/** One entry per date from start to end (inclusive), using the split's current weekly plan. */
+export function trainingCalendar(splitId: number | null | undefined, start: string, end: string): CalDay[] {
+  const week = splitId ? getSchedule(splitId) : null
+  const names = new Map((splitId ? listDays(splitId) : []).map((d) => [d.id, d.name]))
+  const done = new Map<string, string[]>()
+  all<{ date: string; day_name: string }>('SELECT date, day_name FROM sessions WHERE date BETWEEN ? AND ? AND ended_at IS NOT NULL ORDER BY started_at', [start, end])
+    .forEach((r) => done.set(r.date, [...(done.get(r.date) ?? []), r.day_name]))
+  const marks = new Map(all<DayMark>('SELECT * FROM day_marks WHERE date BETWEEN ? AND ?', [start, end]).map((m) => [m.date, m]))
+  const t = today()
+  // Days before the split existed are not "missed".
+  const since = splitId ? (get<{ c: string }>('SELECT created_at AS c FROM splits WHERE id = ?', [splitId])?.c ?? '').slice(0, 10) : ''
+  const out: CalDay[] = []
+  for (let d = start; d <= end; d = addDays(d, 1)) {
+    const wd = (new Date(d + 'T12:00:00').getDay() + 6) % 7
+    const id = week ? week[wd] : null
+    const planned = id ? names.get(id) : undefined
+    const sessions = done.get(d) ?? []
+    const mark = marks.get(d)
+    const restPlanned = !!week && !planned
+    const state: CalState = sessions.length ? 'done' : mark ? mark.status : d < since ? 'none' : restPlanned ? 'rest'
+      : planned ? (d < t ? 'missed' : d === t ? 'today' : 'planned') : 'none'
+    out.push({ date: d, planned, plannedDayId: id ?? undefined, restPlanned, sessions, mark, state })
+  }
+  return out
+}
+
 export function nextDay(splitId: number): SplitDay | undefined {
   const days = listDays(splitId)
   if (!days.length) return undefined
+  const today = scheduledFor(splitId)
+  if (today.day) return today.day
   const last = get<{ day_id: number }>(`SELECT s.day_id FROM sessions s JOIN split_days d ON d.id = s.day_id WHERE d.split_id = ? AND s.ended_at IS NOT NULL ORDER BY s.date DESC, s.id DESC LIMIT 1`, [splitId])
   if (!last) return days[0]
   const i = days.findIndex((d) => d.id === last.day_id)

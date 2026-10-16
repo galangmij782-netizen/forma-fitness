@@ -52,3 +52,37 @@ Squat 5x3`)
     expect(p.days[1].exercises.map((e) => e.name)).toEqual(['Back Squat', 'Leg Curl'])
   })
 })
+
+describe('weekdays', () => {
+  it('reads weekdays from headers and merges repeats', () => {
+    const p = parseProgram(`Monday - Rest
+Lower A (Tuesday)
+Hack squat 2x6-8
+Leg curl 2x6-8
+Upper A (Wednesday)
+Incline bench 2x6-8
+Thursday: Rest
+Friday - Lower A
+Hack squat 2x6-8
+Leg curl 2x6-8
+Sat - Upper B
+Row 3x10`)
+    expect(p.title).toBeNull()
+    expect(p.days.map((d) => [d.name, d.weekdays])).toEqual([['Lower A', [1, 4]], ['Upper A', [2]], ['Upper B', [5]]])
+  })
+  it('uses a weekly overview at the top', () => {
+    const p = parseProgram(`My PPL
+Mon - Push
+Tue - Pull
+Wed - Legs
+Thu - Push
+Push
+Bench 3x8
+Pull
+Row 3x8
+Legs
+Squat 3x5`)
+    expect(p.title).toBe('My PPL')
+    expect(p.days.map((d) => [d.name, d.weekdays])).toEqual([['Push', [0, 3]], ['Pull', [1]], ['Legs', [2]]])
+  })
+})

@@ -1,7 +1,7 @@
 // Realistic sample data so every screen can be explored before real logging starts.
 import { tx } from './db'
 import { addDays, today } from './dates'
-import { createSplit, dayExercises, listDays, saveProfile } from './repo'
+import { createSplit, dayExercises, listDays, saveProfile, setScheduleDay } from './repo'
 
 function rng(seed: number) {
   return () => { seed = (seed * 1664525 + 1013904223) % 4294967296; return seed / 4294967296 }
@@ -24,6 +24,8 @@ export function loadSampleData() {
   createSplit('ul')
   const splitId = createSplit('ppl')
   const days = listDays(splitId)
+  // Push, Pull, Legs, rest, Push, Pull, rest.
+  ;[0, 1, 2, null, 0, 1, null].forEach((i, w) => setScheduleDay(splitId, w, i === null ? null : days[i]?.id ?? null))
   const plan = days.map((d) => ({ day: d, ex: dayExercises(d.id) }))
 
   // Per-exercise starting weight, progression per session and behaviour.

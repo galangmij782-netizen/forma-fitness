@@ -16,6 +16,10 @@ Open the GitHub Pages link in Safari, tap Share, then "Add to Home Screen". It r
 
 In Splits, tap **Type your program** and write it like a note: a day name on its own line (Push, Day 1, Monday), then one exercise per line such as `Incline bench press 3x8-12` or `Lateral raises 3 sets of 15, rest 60s`. The preview shows each day as you type, and Create split adds it to Splits.
 
+## Weekly plan and calendar
+
+Each split has a weekly plan (Mon to Sun, a workout or Rest). If your typed program names the days, like "Lower A (Tuesday)" or "Fri - Lower A", the plan fills in by itself. Workouts shows a month calendar: trained days in green, missed planned days in red, rest days in grey. Tap a past day to mark that you didn't train, with a reason, or that it was a rest day.
+
 ## Timed sets and rest alarm
 
 During a workout, tap **Start set** before you lift and **Finish set** when you rack it. The set is logged and the rest countdown starts. When rest ends, an alarm rings (Ring, Beep, Soft or Off in Settings) and the phone vibrates where supported. The screen stays on during a workout. On iPhone, the alarm only plays while the app is open.

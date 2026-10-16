@@ -5,7 +5,7 @@ import { Button, Empty, IconButton, PageHeader, Sheet, Stepper, rise, softSpring
 import { useQuery } from '../lib/db'
 import { useNav } from '../lib/nav'
 import {
-  TEMPLATES, addDay, addDayExercise, createSplit, createSplitFromProgram, dayExercises, deleteDay, deleteSplit, duplicateSplit, ensureExercise,
+  TEMPLATES, WEEKDAYS, addDay, clearSchedule, getSchedule, setScheduleDay, weekdayOf, addDayExercise, createSplit, createSplitFromProgram, dayExercises, deleteDay, deleteSplit, duplicateSplit, ensureExercise,
   getProfile, listDays, listExercises, listSplits, removeDayExercise, renameDay, reorder, saveProfile, updateDayExercise, updateSplit,
 } from '../lib/repo'
 import { parseProgram } from '../lib/programText'
@@ -142,7 +142,7 @@ function ProgramSheet({ open, onClose, onCreated }: { open: boolean; onClose: ()
           {!count && <div className="card flat pad-sm t-sm muted">Your split will appear here as you type.</div>}
           {days.map((d, i) => (
             <motion.div key={i} layout className="card flat pad-sm" style={{ background: 'var(--surface)' }}>
-              <div className="row between" style={{ marginBottom: 8 }}><span className="w-600">{d.name}</span><span className="t-xs faint">{d.exercises.length} exercises · {d.exercises.reduce((a, e) => a + e.sets, 0)} sets</span></div>
+              <div className="row between" style={{ marginBottom: 8 }}><span className="w-600">{d.name}{d.weekdays?.length ? <span className="t-xs accent" style={{ marginLeft: 8 }}>{d.weekdays.map((w) => WEEKDAYS[w]).join(', ')}</span> : null}</span><span className="t-xs faint">{d.exercises.length} exercises · {d.exercises.reduce((a, e) => a + e.sets, 0)} sets</span></div>
               <div className="col" style={{ gap: 6 }}>
                 {d.exercises.map((e, j) => (
                   <div key={j} className="row" style={{ gap: 8 }}>
@@ -201,6 +201,7 @@ function SplitDetail({ id, onBack }: { id: number; onBack: () => void }) {
       <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ ...softSpring, delay: 0.12 }}>
         <input className="input bare muted" placeholder="Add a short description" value={split.description} onChange={(e) => updateSplit(id, { description: e.target.value })} style={{ marginTop: 6, width: '100%' }} />
         <div className="divider" style={{ margin: '24px 0' }} />
+        <WeekPlan splitId={id} days={days} />
         <Reorder.Group axis="y" values={order} onReorder={setOrder} as="div" className="col" style={{ gap: 14 }}>
           {order.map((dayId, i) => dayMap.get(dayId) && (
             <DayCard key={dayId} day={dayMap.get(dayId)!} index={i} onDrop={() => reorder('split_days', order)} />
@@ -209,6 +210,35 @@ function SplitDetail({ id, onBack }: { id: number; onBack: () => void }) {
         <Button style={{ marginTop: 16 }} onClick={() => addDay(id, `Day ${days.length + 1}`)}><Plus size={15} /> Add day</Button>
       </motion.div>
     </motion.div>
+  )
+}
+
+function WeekPlan({ splitId, days }: { splitId: number; days: SplitDay[] }) {
+  const week = useQuery(() => getSchedule(splitId), [splitId, days.length])
+  const todayW = weekdayOf()
+  return (
+    <div style={{ marginBottom: 24 }}>
+      <div className="row between" style={{ marginBottom: 10 }}>
+        <div><span className="w-600">Weekly plan</span> <span className="t-xs faint">{week ? 'Tap a day to change it' : 'Tap a day to pick its workout'}</span></div>
+        {week && <button className="t-xs faint" onClick={() => clearSchedule(splitId)}>Clear</button>}
+      </div>
+      <div className="week-plan">
+        {WEEKDAYS.map((w, i) => {
+          const dayId = week?.[i] ?? null
+          const name = dayId ? days.find((d) => d.id === dayId)?.name : undefined
+          return (
+            <label key={w} className={`week-cell ${name ? 'on' : ''} ${i === todayW ? 'is-today' : ''}`}>
+              <div className="wd">{w}</div>
+              <div className="wn">{name ?? (week ? 'Rest' : '–')}</div>
+              <select aria-label={`${w} workout`} value={dayId ?? ''} onChange={(e) => setScheduleDay(splitId, i, e.target.value ? Number(e.target.value) : null)}>
+                <option value="">Rest</option>
+                {days.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
+              </select>
+            </label>
+          )
+        })}
+      </div>
+    </div>
   )
 }
 

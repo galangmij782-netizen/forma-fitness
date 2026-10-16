@@ -5,7 +5,21 @@
 import type { MuscleGroup } from './types'
 
 export interface ProgramExercise { name: string; muscle: MuscleGroup; sets: number; repsMin: number; repsMax: number; rest: number; restGiven: boolean; line: string }
-export interface ProgramDay { name: string; exercises: ProgramExercise[] }
+export interface ProgramDay { name: string; exercises: ProgramExercise[]; weekdays?: number[] }
+
+// Weekday 0 = Monday. English and Tagalog names and short forms.
+const WEEKDAY_RE: [number, RegExp][] = [
+  [0, /\b(mon(day)?|lunes)\b/i], [1, /\b(tue(s(day)?)?|martes)\b/i], [2, /\b(wed(nesday)?|miyerkules|miyerkoles)\b/i],
+  [3, /\b(thu(r(s(day)?)?)?|huwebes)\b/i], [4, /\b(fri(day)?|biyernes)\b/i], [5, /\b(sat(urday)?|sabado)\b/i], [6, /\b(sun(day)?|linggo)\b/i],
+]
+const WEEKDAY_ANY = /\b(mon(day)?|tue(s(day)?)?|wed(nesday)?|thu(r(s(day)?)?)?|fri(day)?|sat(urday)?|sun(day)?|lunes|martes|miyerkules|miyerkoles|huwebes|biyernes|sabado|linggo)\b/gi
+export const weekdaysIn = (line: string) => WEEKDAY_RE.filter(([, re]) => re.test(line)).map(([w]) => w)
+/** "Lower A (Tuesday)", "Tue - Lower A", "Lower A – Tue/Fri" -> "Lower A". */
+export function stripWeekdays(line: string) {
+  const out = line.replace(WEEKDAY_ANY, ' ').replace(/\(\s*[\/,&+\s]*(and|at)?[\/,&+\s]*\)/gi, ' ').replace(/\s*(?:[\/,&+]|\band\b)\s*(?=[\/,&+\s]*$)/gi, ' ')
+  return out.replace(/^[\s:\-–—|.,\/&+]+|[\s:\-–—|.,\/&+]+$/g, '').replace(/\s{2,}/g, ' ').trim()
+}
+const isRestLine = (l: string) => /\b(rest|off|recovery|pahinga|walang gym)\b/i.test(stripWeekdays(l)) && !/\d\s*[x×]/.test(l)
 export interface Program { title: string | null; days: ProgramDay[] }
 
 const MUSCLE_RULES: [MuscleGroup, RegExp][] = [
@@ -82,7 +96,10 @@ function readSetsReps(line: string): { sets: number; min: number; max: number; t
   return null
 }
 
+const dayKey = (name: string) => name.toLowerCase().replace(/[^a-z0-9]/g, '')
+
 export function parseProgram(text: string): Program {
+  const overview: { weekdays: number[]; key: string }[] = []
   const lines = text.split(/\r?\n/).map((l) => l.replace(/^\s*(?:[-*•▪◦]|\d+[.)])\s*/, '').trim()).filter(Boolean)
   const days: ProgramDay[] = []
   let title: string | null = null
@@ -96,16 +113,22 @@ export function parseProgram(text: string): Program {
       if (rest && lastEx && !pendingHeaders.length && line.length < 40) { lastEx.rest = rest.secs; lastEx.restGiven = true; continue }
       // Coaching notes are not day names.
       if (lastEx && !pendingHeaders.length && /^(notes?|tips?|cues?|focus|tempo|warm[ -]?up|cool[ -]?down|rpe|rir|progression|superset)\b/i.test(line)) continue
+      if (weekdaysIn(line).length && !isRestLine(line) && stripWeekdays(line)) overview.push({ weekdays: weekdaysIn(line), key: dayKey(stripWeekdays(line).replace(/^(day|araw)\s*\d+\s*[:\-–—.]?\s*/i, '')) })
       // A header: strip "Day 1:" style prefixes but keep the useful part ("Day 1 - Push" -> "Push").
       const h = line.replace(/[:\-–—]+\s*$/, '').trim()
       pendingHeaders.push(h)
       continue
     }
     if (pendingHeaders.length || !days.length) {
-      if (pendingHeaders.length > 1 && !days.length && !title) title = pendingHeaders.shift()!
-      const raw = pendingHeaders.pop()
-      const name = raw ? (raw.replace(/^(day|araw)\s*\d+\s*[:\-–—.]?\s*/i, '').trim() || raw) : `Day ${days.length + 1}`
-      days.push({ name: titleCase(name.toLowerCase()), exercises: [] })
+      if (pendingHeaders.length > 1 && !days.length && !title && !weekdaysIn(pendingHeaders[0]).length && !/^(week|linggo)\s*\d/i.test(pendingHeaders[0])) title = pendingHeaders.shift()!
+      // Weekday names in this day's own header ("Lower A (Tuesday)", or "Tuesday" on the line above it).
+      const own = pendingHeaders.filter((h) => !isRestLine(h))
+      const raw = own.pop()
+      const wk = raw ? weekdaysIn(raw) : []
+      if (raw && !wk.length && own.length && weekdaysIn(own[own.length - 1]).length && !stripWeekdays(own[own.length - 1])) wk.push(...weekdaysIn(own[own.length - 1]))
+      const plain = raw ? stripWeekdays(raw) || raw : ''
+      const name = plain ? (plain.replace(/^(day|araw)\s*\d+\s*[:\-–—.]?\s*/i, '').trim() || plain) : `Day ${days.length + 1}`
+      days.push({ name: titleCase(name.toLowerCase()), exercises: [], weekdays: wk })
       pendingHeaders = []
     }
     const rest = readRest(line)
@@ -120,12 +143,23 @@ export function parseProgram(text: string): Program {
   }
   // Programs written week by week repeat the same day ("Week 1 ... Lower A ... Week 2 ... Lower A").
   // A split day is a template, so keep the first one of each name.
-  const seen = new Set<string>()
-  const unique = days.filter((d) => {
-    if (!d.exercises.length) return false
-    const key = d.name.toLowerCase().replace(/[^a-z0-9]/g, '')
-    if (seen.has(key)) return false
-    seen.add(key); return true
-  })
+  // Repeats of the same day add their weekdays to the first one.
+  const byKey = new Map<string, ProgramDay>()
+  for (const d of days) {
+    if (!d.exercises.length) continue
+    const key = dayKey(d.name)
+    const first = byKey.get(key)
+    if (first) first.weekdays = [...new Set([...(first.weekdays ?? []), ...(d.weekdays ?? [])])]
+    else byKey.set(key, d)
+  }
+  const unique = [...byKey.values()]
+  // A weekly overview ("Mon - Rest, Tue - Lower A") fills in weekdays the day headers left out.
+  for (const o of overview) {
+    const d = byKey.get(o.key)
+    if (d) d.weekdays = [...new Set([...(d.weekdays ?? []), ...o.weekdays])]
+  }
+  // One day per weekday: the first day that claims it keeps it.
+  const taken = new Set<number>()
+  for (const d of unique) { d.weekdays = (d.weekdays ?? []).filter((w) => !taken.has(w)).sort(); d.weekdays.forEach((w) => taken.add(w)) }
   return { title, days: unique }
 }

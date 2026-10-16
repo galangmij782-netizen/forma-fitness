@@ -2,6 +2,7 @@ import { AnimatePresence, motion } from 'motion/react'
 import { Check, ChevronDown, Clock, Dumbbell, Flag, Play, Plus, Square, Timer, Trash2, Trophy } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { useCelebrate } from '../components/Celebrate'
+import { TrainingCalendar } from '../components/TrainingCalendar'
 import { useRestTimer } from '../components/RestTimer'
 import { Button, Card, CountUp, Empty, PageHeader, rise, spring, stagger } from '../components/ui'
 import { all, useQuery } from '../lib/db'
@@ -9,7 +10,7 @@ import { fmtDay } from '../lib/dates'
 import { useNav } from '../lib/nav'
 import {
   activeSession, dayExercises, deleteSession, deleteSet, exerciseHistory, finishSession, getProfile, lastPerformance,
-  listDays, listSessions, listSplits, logSet, nextDay, sessionSets, startSession,
+  listDays, listSessions, listSplits, logSet, nextDay, scheduledFor, sessionSets, startSession,
 } from '../lib/repo'
 import { isNewPR } from '../lib/training'
 import type { DayExercise, SetRow } from '../lib/types'
@@ -32,15 +33,16 @@ export function Workouts() {
     if (!started.current && params.startDay && !activeSession()) { started.current = true; startSession(params.startDay as number) }
   }, [params.startDay])
   if (live === undefined && params.startDay && !started.current) return null
-  return live ? <LiveSession key={live.id} sessionId={live.id} /> : <StartView onSplits={() => go('splits')} />
+  return live ? <LiveSession key={live.id} sessionId={live.id} /> : <StartView onSplits={(splitId) => go('splits', splitId ? { splitId } : {})} />
 }
 
-function StartView({ onSplits }: { onSplits: () => void }) {
+function StartView({ onSplits }: { onSplits: (splitId?: number) => void }) {
   const data = useQuery(() => {
     const p = getProfile()
     const splits = listSplits()
     const sid = p.active_split_id ?? splits[0]?.id
-    return { splits, sid, days: sid ? listDays(sid).map((d) => ({ ...d, ex: dayExercises(d.id) })) : [], next: sid ? nextDay(sid) : undefined, history: listSessions(40) }
+    return { splits, sid, days: sid ? listDays(sid).map((d) => ({ ...d, ex: dayExercises(d.id) })) : [], next: sid ? nextDay(sid) : undefined, history: listSessions(40),
+      scheduledToday: !!(sid && scheduledFor(sid).day), restToday: !!(sid && scheduledFor(sid).rest) }
   }, [])
   const [splitId, setSplitId] = useState<number | null>(null)
   const days = useQuery(() => (splitId ? listDays(splitId).map((d) => ({ ...d, ex: dayExercises(d.id) })) : null), [splitId])
@@ -57,17 +59,18 @@ function StartView({ onSplits }: { onSplits: () => void }) {
             {data.splits.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
           </select>
         )} />
+      {current && <TrainingCalendar splitId={current} onPlan={() => onSplits(current)} />}
       {shownDays.length === 0 ? (
-        <Card><Empty icon={<Dumbbell size={22} />} title="No split to train from" body="Create a split with at least one day, then start your first session here." action={<Button variant="primary" onClick={onSplits}>Set up a split</Button>} /></Card>
+        <Card><Empty icon={<Dumbbell size={22} />} title="No split to train from" body="Create a split with at least one day, then start your first session here." action={<Button variant="primary" onClick={() => onSplits()}>Set up a split</Button>} /></Card>
       ) : (
         <div className="grid g-3" style={{ marginBottom: 40 }}>
           {shownDays.map((d) => {
-            const isNext = !splitId && data.next?.id === d.id
+            const isNext = !splitId && data.next?.id === d.id && !data.restToday
             return (
               <Card key={d.id} interactive onClick={() => startSession(d.id)} style={isNext ? { boxShadow: '0 0 0 1.5px var(--accent), var(--shadow-md)' } : undefined}>
                 <div className="row between" style={{ marginBottom: 8 }}>
                   <div className="t-lg w-600">{d.name}</div>
-                  {isNext && <span className="chip accent">Up next</span>}
+                  {isNext && <span className="chip accent">{data.scheduledToday ? 'Today' : 'Up next'}</span>}
                 </div>
                 <div className="t-sm muted" style={{ marginBottom: 16 }}>{d.ex.length} exercises · {d.ex.reduce((a, e) => a + e.sets, 0)} sets</div>
                 <div className="col" style={{ gap: 6 }}>

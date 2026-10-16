@@ -10,7 +10,7 @@ import { weeklyInsights, type Insight } from '../lib/insights'
 import { CoachTips, useCoach } from '../components/Coach'
 import { useNav, useSession } from '../lib/nav'
 import { PHASES } from '../lib/nutrition'
-import { activeSession, allSets, dayExercises, getSplit, mealsOn, nextDay, splitMuscles } from '../lib/repo'
+import { activeSession, allSets, dayExercises, getSplit, mealsOn, nextDay, scheduledFor, splitMuscles } from '../lib/repo'
 import { analyzeTraining } from '../lib/training'
 import { weeklyRate } from '../lib/trend'
 import { useUnits } from '../lib/units'
@@ -29,7 +29,8 @@ export function Dashboard() {
     const sid = t?.profile.active_split_id
     const split = sid ? getSplit(sid) : undefined
     const day = sid ? nextDay(sid) : undefined
-    return { live, split, day, ex: day ? dayExercises(day.id) : [] }
+    const plan = sid ? scheduledFor(sid) : undefined
+    return { live, split, day, ex: day ? dayExercises(day.id) : [], rest: !!plan?.rest, today: !!plan?.day }
   }, [t?.profile.active_split_id])
   const flags = useQuery(() => t && analyzeTraining({
     sets: allSets(), today: today(), cutting: t.profile.phase === 'cut',
@@ -94,10 +95,16 @@ export function Dashboard() {
 
         <Card interactive onClick={() => go('workouts', workout?.live ? {} : { startDay: workout?.day?.id })}>
           <div className="row between" style={{ marginBottom: 18 }}>
-            <div className="card-title">{workout?.live ? 'Workout in progress' : 'Next workout'}</div>
+            <div className="card-title">{workout?.live ? 'Workout in progress' : workout?.rest ? 'Today' : workout?.today ? "Today's workout" : 'Next workout'}</div>
             <Dumbbell size={16} className="faint" />
           </div>
-          {workout?.day ? (
+          {workout?.rest && !workout.live ? (
+            <>
+              <div className="t-xl w-600" style={{ letterSpacing: '-0.02em' }}>Rest day</div>
+              <div className="t-sm muted" style={{ marginBottom: 18 }}>Your plan has no workout today. Recovery is when muscle is built, so eat your protein and sleep well.</div>
+              <div className="row accent t-sm w-500" style={{ gap: 6 }}>Train anyway: {workout.day?.name} <ArrowRight size={15} /></div>
+            </>
+          ) : workout?.day ? (
             <>
               <div className="t-xl w-600" style={{ letterSpacing: '-0.02em' }}>{workout.live?.day_name ?? workout.day.name}</div>
               <div className="t-sm muted" style={{ marginBottom: 18 }}>{workout.split?.name} · {workout.ex.length} exercises</div>

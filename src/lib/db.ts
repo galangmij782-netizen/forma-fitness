@@ -11,8 +11,10 @@ CREATE TABLE IF NOT EXISTS exercises (id INTEGER PRIMARY KEY, name TEXT NOT NULL
 CREATE TABLE IF NOT EXISTS splits (id INTEGER PRIMARY KEY, name TEXT NOT NULL, description TEXT NOT NULL DEFAULT '', position INTEGER NOT NULL DEFAULT 0, created_at TEXT NOT NULL);
 CREATE TABLE IF NOT EXISTS split_days (id INTEGER PRIMARY KEY, split_id INTEGER NOT NULL REFERENCES splits(id) ON DELETE CASCADE, name TEXT NOT NULL, position INTEGER NOT NULL);
 CREATE TABLE IF NOT EXISTS day_exercises (id INTEGER PRIMARY KEY, day_id INTEGER NOT NULL REFERENCES split_days(id) ON DELETE CASCADE, exercise_id INTEGER NOT NULL REFERENCES exercises(id), position INTEGER NOT NULL, sets INTEGER NOT NULL, reps_min INTEGER NOT NULL, reps_max INTEGER NOT NULL, rest_sec INTEGER NOT NULL);
+CREATE TABLE IF NOT EXISTS split_schedule (split_id INTEGER NOT NULL REFERENCES splits(id) ON DELETE CASCADE, weekday INTEGER NOT NULL, day_id INTEGER REFERENCES split_days(id) ON DELETE SET NULL, PRIMARY KEY (split_id, weekday));
 CREATE TABLE IF NOT EXISTS sessions (id INTEGER PRIMARY KEY, day_id INTEGER REFERENCES split_days(id) ON DELETE SET NULL, day_name TEXT NOT NULL, split_name TEXT NOT NULL, date TEXT NOT NULL, started_at TEXT NOT NULL, ended_at TEXT);
 CREATE TABLE IF NOT EXISTS sets (id INTEGER PRIMARY KEY, session_id INTEGER NOT NULL REFERENCES sessions(id) ON DELETE CASCADE, exercise_id INTEGER NOT NULL REFERENCES exercises(id), set_index INTEGER NOT NULL, weight REAL NOT NULL, reps INTEGER NOT NULL, target_min INTEGER NOT NULL, target_max INTEGER NOT NULL);
+CREATE TABLE IF NOT EXISTS day_marks (date TEXT PRIMARY KEY, status TEXT NOT NULL, note TEXT NOT NULL DEFAULT '');
 CREATE TABLE IF NOT EXISTS bodyweight (id INTEGER PRIMARY KEY, date TEXT NOT NULL UNIQUE, kg REAL NOT NULL);
 CREATE TABLE IF NOT EXISTS foods (id INTEGER PRIMARY KEY, name TEXT NOT NULL UNIQUE COLLATE NOCASE, grams REAL NOT NULL, kcal REAL NOT NULL, protein REAL NOT NULL, carbs REAL NOT NULL, fat REAL NOT NULL, favorite INTEGER NOT NULL DEFAULT 0, last_used TEXT, uses INTEGER NOT NULL DEFAULT 0);
 CREATE TABLE IF NOT EXISTS meals (id INTEGER PRIMARY KEY, date TEXT NOT NULL, time TEXT NOT NULL, name TEXT NOT NULL, source TEXT NOT NULL, photo TEXT);
@@ -21,7 +23,7 @@ CREATE INDEX IF NOT EXISTS idx_sets_ex ON sets(exercise_id);
 CREATE INDEX IF NOT EXISTS idx_sessions_date ON sessions(date);
 CREATE INDEX IF NOT EXISTS idx_meals_date ON meals(date);
 `
-export const TABLES = ['settings', 'exercises', 'splits', 'split_days', 'day_exercises', 'sessions', 'sets', 'bodyweight', 'foods', 'meals', 'meal_items'] as const
+export const TABLES = ['settings', 'exercises', 'splits', 'split_days', 'day_exercises', 'split_schedule', 'sessions', 'sets', 'day_marks', 'bodyweight', 'foods', 'meals', 'meal_items'] as const
 
 let SQL: Awaited<ReturnType<typeof initSqlJs>> | null = null
 let db: Database | null = null
