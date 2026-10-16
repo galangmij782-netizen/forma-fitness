@@ -197,7 +197,7 @@ export function saveMeal(meal: { id?: number; date: string; time?: string; name:
         [id, it.name, it.grams, it.kcal, it.protein, it.carbs, it.fat, it.confidence ?? null, it.food_id ?? null])
       // Every logged item becomes a reusable food (per its logged portion).
       exec(`INSERT INTO foods(name, grams, kcal, protein, carbs, fat, last_used, uses) VALUES(?,?,?,?,?,?,?,1)
-        ON CONFLICT(name) DO UPDATE SET last_used = excluded.last_used, uses = uses + 1`,
+        ON CONFLICT(name) DO UPDATE SET grams = excluded.grams, kcal = excluded.kcal, protein = excluded.protein, carbs = excluded.carbs, fat = excluded.fat, last_used = excluded.last_used, uses = uses + 1`,
         [it.name, it.grams, it.kcal, it.protein, it.carbs, it.fat, new Date().toISOString()])
     }
     return id
@@ -216,6 +216,7 @@ export function dayTotals(from: string, to: string): DayTotals[] {
 
 // ---------- foods ----------
 export const searchFoods = (q: string) => all<Food>(`SELECT * FROM foods WHERE name LIKE ? ORDER BY favorite DESC, uses DESC, name LIMIT 30`, [`%${q}%`])
+export const allFoods = () => all<Food>('SELECT * FROM foods ORDER BY uses DESC LIMIT 1000')
 export const recentFoods = () => all<Food>('SELECT * FROM foods WHERE last_used IS NOT NULL ORDER BY last_used DESC LIMIT 12')
 export const favoriteFoods = () => all<Food>('SELECT * FROM foods WHERE favorite = 1 ORDER BY name')
 export const toggleFavorite = (id: number) => run('UPDATE foods SET favorite = 1 - favorite WHERE id = ?', [id])

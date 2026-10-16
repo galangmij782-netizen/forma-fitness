@@ -12,6 +12,12 @@ To install it on a second laptop, copy the same zip over and repeat the steps. E
 ## iPhone and iPad
 Open the GitHub Pages link in Safari, tap Share, then "Add to Home Screen". It runs full screen and keeps its data on the device.
 
+## Logging meals by typing (free, offline)
+On Meals, type what you ate, e.g. `2 medium eggs scrambled, 1 tbsp butter, 1 mug coffee`. Calories and macros fill in as you type, from a built-in list of about 150 common and Filipino foods. If a food isn't in the list, tap it to enter its calories once and it's remembered next time.
+
+## Coach
+The Coach card on the Dashboard and Meals reads what you've eaten and gives lifting-focused tips: protein per day and per meal, carbs after training, fruit and veg, sweet drinks, alcohol and salty food. Each tip explains why it matters. It runs offline and isn't a chatbot.
+
 ## Barcode scanning (free)
 On Meals, tap "Scan barcode" and point the camera at a packaged food. Nutrition comes from Open Food Facts, a free database, so no account or key is needed. You can also type the number.
 

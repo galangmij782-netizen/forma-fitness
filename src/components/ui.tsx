@@ -73,7 +73,7 @@ export function Stepper({ value, onChange, step = 1, min = 0, max = 9999, width 
       <motion.button whileTap={{ scale: 0.85 }} onClick={() => commit(value - step)} aria-label="Decrease"><Minus size={14} /></motion.button>
       <input style={width ? { width } : undefined} value={text} inputMode="decimal"
         onChange={(e) => setText(e.target.value)}
-        onBlur={() => { const n = parseFloat(text); if (Number.isFinite(n)) commit(n); else setText(String(value)) }}
+        onBlur={() => { const n = parseFloat(text.replace(',', '.')); if (Number.isFinite(n)) commit(n); else setText(String(value)) }}
         onKeyDown={(e) => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur() }} />
       <motion.button whileTap={{ scale: 0.85 }} onClick={() => commit(value + step)} aria-label="Increase"><Plus size={14} /></motion.button>
     </div>
@@ -145,7 +145,7 @@ export function Bar({ value, delay = 0, color }: { value: number; delay?: number
 }
 
 // ---------- toasts ----------
-interface Toast { id: number; icon?: ReactNode; title: string; body?: string }
+interface Toast { id: number; icon?: ReactNode; title: string; body?: string; action?: { label: string; run: () => void } }
 const ToastCtx = createContext<(t: Omit<Toast, 'id'>) => void>(() => {})
 export const useToast = () => useContext(ToastCtx)
 
@@ -155,7 +155,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
   const push = useCallback((t: Omit<Toast, 'id'>) => {
     const id = ++n.current
     setToasts((x) => [...x, { ...t, id }])
-    setTimeout(() => setToasts((x) => x.filter((y) => y.id !== id)), 3200)
+    setTimeout(() => setToasts((x) => x.filter((y) => y.id !== id)), t.action ? 6000 : 3200)
   }, [])
   return (
     <ToastCtx.Provider value={push}>
@@ -169,6 +169,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
                 <div className="w-600 t-sm">{t.title}</div>
                 {t.body && <div className="t-xs muted">{t.body}</div>}
               </div>
+              {t.action && <button className="btn sm" style={{ marginLeft: 8 }} onClick={() => { t.action!.run(); setToasts((x) => x.filter((y) => y.id !== t.id)) }}>{t.action.label}</button>}
             </motion.div>
           ))}
         </AnimatePresence>

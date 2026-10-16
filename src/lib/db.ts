@@ -141,6 +141,7 @@ export function importJson(json: string) {
     for (const t of TABLES) {
       for (const row of (parsed.data[t] ?? []) as Record<string, SqlValue>[]) {
         const cols = Object.keys(row)
+        if (!cols.every((c) => /^[a-z_]+$/.test(c))) throw new Error('This backup file is damaged.')
         d.run(`INSERT INTO ${t} (${cols.join(',')}) VALUES (${cols.map(() => '?').join(',')})`, cols.map((c) => row[c]))
       }
     }

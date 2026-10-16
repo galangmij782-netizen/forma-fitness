@@ -134,7 +134,7 @@ function DayCard({ day, index, onDrop }: { day: SplitDay; index: number; onDrop:
 
   return (
     <Reorder.Item value={day.id} as="div" dragListener={false} dragControls={controls} onDragEnd={onDrop}
-      className="card flat" style={{ padding: 20, background: 'var(--surface)' }}
+      className="card flat day-card" style={{ padding: 20, background: 'var(--surface)' }}
       whileDrag={{ scale: 1.01, boxShadow: 'var(--shadow-lg)' }} transition={spring}>
       <div className="row" style={{ marginBottom: 12 }}>
         <div onPointerDown={(e) => controls.start(e)} style={{ cursor: 'grab', touchAction: 'none', color: 'var(--text-3)' }} title="Drag to reorder"><GripVertical size={16} /></div>
@@ -144,9 +144,8 @@ function DayCard({ day, index, onDrop }: { day: SplitDay; index: number; onDrop:
         <IconButton label="Delete day" className="sm" onClick={() => deleteDay(day.id)}><Trash2 size={14} /></IconButton>
       </div>
       {ex.length > 0 && (
-        <div className="row t-xs faint hide-md" style={{ padding: '0 8px 6px 30px', gap: 12 }}>
-          <span className="grow">Exercise</span><span style={{ width: 108, textAlign: 'center' }}>Sets</span><span style={{ width: 108, textAlign: 'center' }}>Reps from</span>
-          <span style={{ width: 108, textAlign: 'center' }}>Reps to</span><span style={{ width: 118, textAlign: 'center' }}>Rest (s)</span><span style={{ width: 28 }} />
+        <div className="ex-head t-xs faint hide-md">
+          <span /><span>Exercise</span><span>Sets</span><span>Reps from</span><span>Reps to</span><span>Rest (sec)</span><span />
         </div>
       )}
       <Reorder.Group axis="y" values={order} onReorder={setOrder} as="div" className="col" style={{ gap: 4 }}>
@@ -166,14 +165,16 @@ function ExerciseRow({ e, onDrop }: { e: DayExercise; onDrop: () => void }) {
     <Reorder.Item value={e.id} as="div" dragListener={false} dragControls={controls} onDragEnd={onDrop}
       initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }}
       whileDrag={{ scale: 1.01, boxShadow: 'var(--shadow-md)' }}
-      className="row wrap-md" style={{ gap: 12, padding: '6px 8px', borderRadius: 12, background: 'var(--bg-2)', position: 'relative' }}>
-      <div onPointerDown={(ev) => controls.start(ev)} style={{ cursor: 'grab', touchAction: 'none', color: 'var(--text-3)' }}><GripVertical size={14} /></div>
-      <div className="grow row" style={{ gap: 8 }}><span className="t-sm w-500">{e.name}</span><span className="chip" style={{ height: 22 }}>{e.muscle}</span></div>
-      <Stepper value={e.sets} min={1} max={12} onChange={(v) => updateDayExercise(e.id, { sets: v })} />
-      <Stepper value={e.reps_min} min={1} max={50} onChange={(v) => updateDayExercise(e.id, { reps_min: v, reps_max: Math.max(v, e.reps_max) })} />
-      <Stepper value={e.reps_max} min={e.reps_min} max={50} onChange={(v) => updateDayExercise(e.id, { reps_max: v })} />
-      <Stepper value={e.rest_sec} min={15} max={600} step={15} width={58} onChange={(v) => updateDayExercise(e.id, { rest_sec: v })} />
-      <IconButton label="Remove exercise" className="sm" onClick={() => removeDayExercise(e.id)}><X size={14} /></IconButton>
+      className="ex-row">
+      <div className="ex-grip" onPointerDown={(ev) => controls.start(ev)} title="Drag to reorder"><GripVertical size={14} /></div>
+      <div className="ex-name"><span className="t-sm w-500">{e.name}</span><span className="chip" style={{ height: 22 }}>{e.muscle}</span></div>
+      <div className="ex-fields">
+        <label className="ex-field"><span>Sets</span><Stepper value={e.sets} min={1} max={12} onChange={(v) => updateDayExercise(e.id, { sets: v })} /></label>
+        <label className="ex-field"><span>Reps from</span><Stepper value={e.reps_min} min={1} max={50} onChange={(v) => updateDayExercise(e.id, { reps_min: v, reps_max: Math.max(v, e.reps_max) })} /></label>
+        <label className="ex-field"><span>Reps to</span><Stepper value={e.reps_max} min={e.reps_min} max={50} onChange={(v) => updateDayExercise(e.id, { reps_max: v })} /></label>
+        <label className="ex-field"><span>Rest (sec)</span><Stepper value={e.rest_sec} min={15} max={600} step={15} width={58} onChange={(v) => updateDayExercise(e.id, { rest_sec: v })} /></label>
+      </div>
+      <IconButton label="Remove exercise" className="sm ex-remove" onClick={() => removeDayExercise(e.id)}><X size={14} /></IconButton>
     </Reorder.Item>
   )
 }

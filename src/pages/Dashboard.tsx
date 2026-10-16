@@ -1,12 +1,13 @@
 import { motion } from 'motion/react'
-import { ArrowRight, Camera, Dumbbell, Flame, Lightbulb, Play, Scale, TrendingUp, TriangleAlert } from 'lucide-react'
+import { ArrowRight, Camera, Dumbbell, Flame, Lightbulb, Play, Plus, Scale, TrendingUp, TriangleAlert } from 'lucide-react'
 import { Sparkline } from '../components/Charts'
 import { Ring } from '../components/Ring'
 import { Button, Card, CountUp, Empty, PageHeader, cardPress, rise, stagger } from '../components/ui'
 import { useQuery } from '../lib/db'
 import { fmtDay, greeting, today } from '../lib/dates'
-import { useDayTotals, useTargets, useWeekTotals } from '../lib/hooks'
+import { useDayTotals, useTargets, useWeekTotals, useIsPhone } from '../lib/hooks'
 import { weeklyInsights, type Insight } from '../lib/insights'
+import { CoachTips, useCoach } from '../components/Coach'
 import { useNav, useSession } from '../lib/nav'
 import { PHASES } from '../lib/nutrition'
 import { activeSession, allSets, dayExercises, getSplit, mealsOn, nextDay, splitMuscles } from '../lib/repo'
@@ -17,6 +18,8 @@ import { useUnits } from '../lib/units'
 export function Dashboard() {
   const { go } = useNav()
   const { name } = useSession()
+  const phone = useIsPhone()
+  const coach = useCoach(today())
   const t = useTargets()
   const totals = useDayTotals()
   const week = useWeekTotals()
@@ -49,7 +52,7 @@ export function Dashboard() {
     <motion.div className="page-inner" variants={stagger} initial="hidden" animate="show">
       <PageHeader title={`${greeting()}, ${name}`} sub={fmtDay(today(), { weekday: 'long', month: 'long', day: 'numeric' })}
         actions={<>
-          <Button onClick={() => go('meals', { add: 'photo' })}><Camera size={16} /> Log meal</Button>
+          <Button onClick={() => go('meals', { add: 'type' })}><Plus size={16} /> Log meal</Button>
           <Button variant="primary" onClick={() => go('workouts', workout?.live ? {} : { startDay: workout?.day?.id })}>
             <Play size={15} /> {workout?.live ? 'Continue workout' : 'Start workout'}
           </Button>
@@ -62,7 +65,7 @@ export function Dashboard() {
             <span className="chip accent">{PHASES[t.profile.phase].label}</span>
           </div>
           <div className="row stack-flex-md" style={{ gap: 40, alignItems: 'center', justifyContent: 'center' }}>
-            <Ring size={196} thickness={14} value={totals.kcal / targets.kcal}>
+            <Ring size={phone ? 150 : 196} thickness={phone ? 12 : 14} value={totals.kcal / targets.kcal}>
               <div>
                 <div className="t-2xl w-600" style={{ lineHeight: 1 }}><CountUp value={Math.round(totals.kcal)} /></div>
                 <div className="t-xs faint" style={{ marginTop: 6 }}>of {targets.kcal.toLocaleString()} kcal</div>
@@ -113,6 +116,8 @@ export function Dashboard() {
           )}
         </Card>
       </div>
+
+      {coach && <CoachTips tips={coach} limit={2} footer={coach.length > 2 && <button className="row accent t-sm w-500" style={{ gap: 6, marginTop: 16 }} onClick={() => go('meals')}>{coach.length - 2} more tips in Meals <ArrowRight size={14} /></button>} />}
 
       <div className="grid g-3" style={{ marginBottom: 16 }}>
         <Card interactive onClick={() => go('progress', { tab: 'body' })}>

@@ -1,7 +1,8 @@
 import { AnimatePresence, motion } from 'motion/react'
 import { Camera, ScanBarcode, ChevronLeft, ChevronRight, Flame, ImagePlus, KeyRound, Pencil, Plus, Search, Sparkles, Star, Trash2, X } from 'lucide-react'
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { BarcodeScanner } from '../components/BarcodeScanner'
+import { CoachTips, useCoach } from '../components/Coach'
 import { useCelebrate } from '../components/Celebrate'
 import { Ring } from '../components/Ring'
 import { Bar, Button, Card, CountUp, Empty, IconButton, PageHeader, Sheet, Skeleton, rise, softSpring, spring, stagger, useToast } from '../components/ui'
@@ -10,16 +11,24 @@ import { addDays, fmtDay, nowTime, today } from '../lib/dates'
 import { useDayTotals, useTargets } from '../lib/hooks'
 import { useNav, useSession } from '../lib/nav'
 import { platform } from '../lib/platform'
-import { dayTotals, deleteMeal, favoriteFoods, mealsOn, recentFoods, saveFood, saveMeal, searchFoods, toggleFavorite } from '../lib/repo'
+import { allFoods, dayTotals, deleteMeal, favoriteFoods, mealsOn, recentFoods, saveFood, saveMeal, searchFoods, toggleFavorite } from '../lib/repo'
 import type { Food, Meal, MealItem } from '../lib/types'
 import type { Product } from '../lib/barcode'
+import { FOODS } from '../lib/foodDb'
+import { mealForTime, parseMeal } from '../lib/mealText'
+import { mealNote } from '../lib/coach'
+
+const BUILTIN_NAMES = new Set(FOODS.map((f) => f.name.toLowerCase()))
 
 const sum = (items: MealItem[], k: keyof Pick<MealItem, 'kcal' | 'protein' | 'carbs' | 'fat'>) => items.reduce((a, i) => a + (Number(i[k]) || 0), 0)
 
 export function Meals() {
   const { params } = useNav()
   const [date, setDate] = useState(today())
-  const [mode, setMode] = useState<null | 'photo' | 'manual' | 'scan' | { edit: Meal }>((params.add as 'photo') ?? null)
+  const [mode, setMode] = useState<null | 'photo' | 'manual' | 'scan' | { edit: Meal } | { review: { name: string; items: MealItem[] } }>(
+    params.add === 'photo' || params.add === 'scan' || params.add === 'manual' ? params.add : null)
+  const toast = useToast()
+  const coach = useCoach(date)
   const meals = useQuery(() => mealsOn(date), [date])
   const totals = useDayTotals(date)
   const t = useTargets()
@@ -35,10 +44,12 @@ export function Meals() {
           <IconButton label="Next day" className="sm" disabled={date >= today()} onClick={() => setDate(addDays(date, 1))}><ChevronRight size={16} /></IconButton>
         </span>}
         actions={<>
-          <Button onClick={() => setMode('manual')}><Plus size={16} /> Add manually</Button>
-          <Button onClick={() => setMode('scan')}><ScanBarcode size={16} /> Scan barcode</Button>
-          <Button variant="primary" onClick={() => setMode('photo')}><Camera size={16} /> Add from photo</Button>
+          <Button onClick={() => setMode('photo')}><Camera size={16} /> Photo</Button>
+          <Button onClick={() => setMode('scan')}><ScanBarcode size={16} /> Barcode</Button>
+          <Button onClick={() => setMode('manual')}><Star size={16} /> Saved foods</Button>
         </>} />
+
+      <QuickLog date={date} autoFocus={params.add === 'type'} onReview={(m) => setMode({ review: m })} />
 
       <Card className="stack-flex-md" style={{ marginBottom: 20, display: 'flex', alignItems: 'center', gap: 36, justifyContent: 'center' }}>
         <Ring size={120} thickness={10} value={totals.kcal / targets.kcal}>
@@ -61,7 +72,7 @@ export function Meals() {
       </Card>
 
       {meals.length === 0 ? (
-        <Card><Empty icon={<Camera size={22} />} title="No meals logged" body="Take a photo of your plate for an instant estimate, or add foods you've saved." action={<Button variant="primary" onClick={() => setMode('photo')}><Camera size={15} /> Add from photo</Button>} /></Card>
+        <Card><Empty icon={<Camera size={22} />} title="No meals logged" body="Type what you ate in the box above, scan a barcode, or snap a photo." /></Card>
       ) : (
         <motion.div className="col" style={{ gap: 12 }} variants={stagger}>
           <AnimatePresence initial={false}>
@@ -80,17 +91,22 @@ export function Meals() {
                   <span className="muted">F {Math.round(sum(m.items, 'fat'))}</span>
                 </div>
                 <IconButton label="Edit meal" onClick={() => setMode({ edit: m })}><Pencil size={15} /></IconButton>
-                <IconButton label="Delete meal" onClick={() => deleteMeal(m.id)}><Trash2 size={15} /></IconButton>
+                <IconButton label="Delete meal" onClick={() => { deleteMeal(m.id); toast({ icon: <Trash2 size={14} />, title: `${m.name} deleted`, action: { label: 'Undo', run: () => saveMeal({ date: m.date, time: m.time, name: m.name, source: m.source, photo: m.photo, items: m.items }) } }) }}><Trash2 size={15} /></IconButton>
               </motion.div>
             ))}
           </AnimatePresence>
         </motion.div>
       )}
 
+      <div style={{ marginTop: 20 }}>{coach && <CoachTips tips={coach} />}</div>
+
       <Sheet open={mode === 'photo'} onClose={() => setMode(null)} xwide title="Meal from a photo"><PhotoFlow date={date} onDone={() => setMode(null)} /></Sheet>
       <Sheet open={mode === 'manual' || mode === 'scan'} onClose={() => setMode(null)} xwide title="Add a meal"><ManualFlow date={date} scan={mode === 'scan'} onDone={() => setMode(null)} /></Sheet>
-      <Sheet open={typeof mode === 'object' && mode !== null} onClose={() => setMode(null)} xwide title="Edit meal">
-        {typeof mode === 'object' && mode !== null && <MealEditor date={date} initial={mode.edit} onDone={() => setMode(null)} />}
+      <Sheet open={!!mode && typeof mode === 'object' && 'edit' in mode} onClose={() => setMode(null)} xwide title="Edit meal">
+        {mode && typeof mode === 'object' && 'edit' in mode && <MealEditor date={date} initial={mode.edit} onDone={() => setMode(null)} />}
+      </Sheet>
+      <Sheet open={!!mode && typeof mode === 'object' && 'review' in mode} onClose={() => setMode(null)} xwide title="Check your meal">
+        {mode && typeof mode === 'object' && 'review' in mode && <MealEditor date={date} initial={{ ...mode.review, source: 'manual' }} onDone={() => { setMode(null); window.dispatchEvent(new Event('forma:quicklog-saved')) }} />}
       </Sheet>
     </motion.div>
   )
@@ -264,14 +280,123 @@ function ManualFlow({ date, onDone, scan }: { date: string; onDone: () => void; 
   )
 }
 
+// ---------- saving ----------
+/** Saves a meal, then celebrates crossing the protein target or shows a short receipt. */
+function useMealSaver() {
+  const celebrate = useCelebrate()
+  const toast = useToast()
+  const t = useTargets()
+  return (meal: Parameters<typeof saveMeal>[0], replacedProtein = 0) => {
+    const before = dayTotals(meal.date, meal.date)[0].protein - replacedProtein
+    saveMeal(meal)
+    const added = sum(meal.items, 'protein')
+    const after = before + added
+    if (t && meal.date === today() && before < t.targets.protein && after >= t.targets.protein) {
+      celebrate({ icon: <Flame size={22} />, title: 'Protein target hit', value: Math.round(after), unit: 'g', caption: `Goal ${t.targets.protein} g for today` })
+    } else toast({ icon: <Flame size={14} />, title: `${meal.name} saved`, body: `${Math.round(sum(meal.items, 'kcal'))} kcal · ${Math.round(added)} g protein` })
+  }
+}
+
+// ---------- typed meals ----------
+const MEAL_TYPES = ['Breakfast', 'Lunch', 'Snack', 'Dinner'] as const
+
+function QuickLog({ date, autoFocus, onReview }: { date: string; autoFocus?: boolean; onReview: (m: { name: string; items: MealItem[] }) => void }) {
+  const [text, setText] = useState('')
+  const [debounced, setDebounced] = useState('')
+  const [type, setType] = useState<string>(() => mealForTime(nowTime()))
+  const box = useRef<HTMLTextAreaElement>(null)
+  const saved = useQuery(() => allFoods(), [])
+  const saveMealNow = useMealSaver()
+  useEffect(() => { const id = setTimeout(() => setDebounced(text), 200); return () => clearTimeout(id) }, [text])
+  useEffect(() => { if (autoFocus) box.current?.focus() }, [autoFocus])
+  useLayoutEffect(() => {
+    const el = box.current
+    if (!el) return
+    el.style.height = 'auto'
+    el.style.height = `${Math.min(el.scrollHeight + 2, 260)}px`
+  }, [text])
+  useEffect(() => {
+    const clear = () => { setText(''); setDebounced('') }
+    window.addEventListener('forma:quicklog-saved', clear)
+    return () => window.removeEventListener('forma:quicklog-saved', clear)
+  }, [])
+  // The user's own foods count, except copies of built-in foods (those store a logged portion, not a unit).
+  const own = useMemo(() => (saved ?? []).filter((f) => !BUILTIN_NAMES.has(f.name.toLowerCase())), [saved])
+  const lines = useMemo(() => parseMeal(debounced, own), [debounced, own])
+  const found = lines.filter((l) => l.item).map((l) => l.item!)
+  const missing = lines.filter((l) => !l.item)
+  const totals = { kcal: sum(found, 'kcal'), protein: sum(found, 'protein'), carbs: sum(found, 'carbs'), fat: sum(found, 'fat') }
+  const note = mealNote(found)
+  const allItems = () => lines.map((l) => l.item ?? { name: l.text, grams: 100, kcal: 0, protein: 0, carbs: 0, fat: 0, confidence: 'low' as const })
+
+  const log = () => {
+    if (!lines.length || text !== debounced) return
+    if (missing.length) return onReview({ name: type, items: allItems() })
+    saveMealNow({ date, time: date === today() ? nowTime() : undefined, name: type, source: 'manual', items: found })
+    setText(''); setDebounced('')
+  }
+
+  return (
+    <Card style={{ marginBottom: 20 }}>
+      <div className="row between wrap-md" style={{ gap: 12, marginBottom: 12 }}>
+        <h3 className="w-600">What did you eat?</h3>
+        <div className="chip-row">
+          {MEAL_TYPES.map((m) => (
+            <button key={m} className={`chip-btn ${type === m ? 'on' : ''}`} onClick={() => setType(m)}>{m}</button>
+          ))}
+        </div>
+      </div>
+      <textarea ref={box} className="input quick-text" rows={2} aria-label="What did you eat?" value={text} onChange={(e) => setText(e.target.value)}
+        onKeyDown={(e) => { if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) { e.preventDefault(); log() } }}
+        placeholder={'2 medium eggs scrambled, 1 tbsp butter, 1 mug coffee'} />
+      <AnimatePresence initial={false}>
+        {lines.length > 0 && (
+          <motion.div key="lines" initial={{ opacity: 0, y: -6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -6 }} transition={softSpring}>
+            <div className="col" style={{ gap: 2, marginTop: 12 }}>
+              {lines.map((l, i) => l.item ? (
+                <div key={i} className="quick-line">
+                  <div className="grow" style={{ minWidth: 0 }}>
+                    <div className="t-sm w-500">{l.item.name}</div>
+                    <div className="t-xs faint">{l.portion}{l.assumed && <span className="guess"> · amount guessed</span>}</div>
+                  </div>
+                  <div className="t-sm num"><span className="w-600">{l.item.kcal}</span> <span className="faint">kcal</span></div>
+                </div>
+              ) : (
+                <button key={i} className="quick-line missing" onClick={() => onReview({ name: type, items: allItems() })}>
+                  <div className="grow" style={{ minWidth: 0, textAlign: 'left' }}>
+                    <div className="t-sm w-500">"{l.text}"</div>
+                    <div className="t-xs">Not in the food list yet. Tap to enter its calories once, and it's remembered.</div>
+                  </div>
+                </button>
+              ))}
+            </div>
+            {note && <div className="t-xs row" style={{ gap: 8, marginTop: 10, color: 'var(--text-2)', alignItems: 'flex-start' }}><Sparkles size={13} className="accent" style={{ flex: 'none', marginTop: 2 }} />{note}</div>}
+            <div className="row between wrap-md" style={{ gap: 12, marginTop: 14 }}>
+              <div className="row num" style={{ gap: 16 }}>
+                <span><span className="t-lg w-600">{Math.round(totals.kcal)}</span> <span className="t-sm faint">kcal</span></span>
+                <span className="t-sm muted">P <b>{Math.round(totals.protein)}</b></span>
+                <span className="t-sm muted">C <b>{Math.round(totals.carbs)}</b></span>
+                <span className="t-sm muted">F <b>{Math.round(totals.fat)}</b></span>
+              </div>
+              <div className="row" style={{ gap: 8 }}>
+                <Button variant="ghost" onClick={() => onReview({ name: type, items: allItems() })}><Pencil size={14} /> Adjust</Button>
+                <Button variant="primary" onClick={log} disabled={text !== debounced}>{missing.length ? 'Review and log' : `Log ${type.toLowerCase()}`}</Button>
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+      {!lines.length && <div className="t-xs faint" style={{ marginTop: 8 }}>Type each food with an amount, separated by commas or new lines. Calories fill in as you type.</div>}
+    </Card>
+  )
+}
+
 // ---------- shared editor ----------
 function MealEditor({ date, initial, notes, onDone, reveal, manual, incoming }: {
   date: string; initial: Partial<Meal> & { items: MealItem[] }; notes?: string; onDone: () => void; reveal?: boolean; manual?: boolean
   incoming?: { item: MealItem; n: number } | null
 }) {
-  const celebrate = useCelebrate()
   const toast = useToast()
-  const t = useTargets()
   const [name, setName] = useState(initial.name ?? '')
   const [time, setTime] = useState(initial.time ?? nowTime())
   const [items, setItems] = useState<MealItem[]>(initial.items.map((i) => ({ ...i, base_grams: i.base_grams ?? i.grams })))
@@ -286,14 +411,10 @@ function MealEditor({ date, initial, notes, onDone, reveal, manual, incoming }: 
   const totals = { kcal: sum(items, 'kcal'), protein: sum(items, 'protein'), carbs: sum(items, 'carbs'), fat: sum(items, 'fat') }
   const valid = items.length > 0 && items.every((i) => i.name.trim())
 
+  const saveMealNow = useMealSaver()
   const save = () => {
-    if (!valid || !t) return
-    const before = dayTotals(date, date)[0].protein - (initial.id ? sum(initial.items, 'protein') : 0)
-    saveMeal({ id: initial.id, date, time, name: name.trim() || items.map((i) => i.name).slice(0, 2).join(' & '), source: initial.source ?? 'manual', photo: initial.photo, items })
-    const after = before + totals.protein
-    if (date === today() && before < t.targets.protein && after >= t.targets.protein) {
-      celebrate({ icon: <Flame size={22} />, title: 'Protein target hit', value: Math.round(after), unit: 'g', caption: `Goal ${t.targets.protein} g for today` })
-    } else toast({ icon: <Flame size={14} />, title: 'Meal saved', body: `${Math.round(totals.kcal)} kcal · ${Math.round(totals.protein)} g protein` })
+    if (!valid) return
+    saveMealNow({ id: initial.id, date, time, name: name.trim() || items.map((i) => i.name).slice(0, 2).join(' & '), source: initial.source ?? 'manual', photo: initial.photo, items }, initial.id ? sum(initial.items, 'protein') : 0)
     onDone()
   }
 
@@ -320,10 +441,10 @@ function MealEditor({ date, initial, notes, onDone, reveal, manual, incoming }: 
                 <input className="input sm" style={{ minWidth: 0 }} value={it.name} placeholder="Food name" onChange={(e) => update(i, { name: e.target.value })} />
                 {it.confidence && <span className={`chip ${it.confidence === 'low' ? 'warn' : ''}`} style={{ height: 22, flex: 'none' }} title="How sure the estimate is">{it.confidence}</span>}
               </div>
-              <input className="input sm num" style={{ width: 84 }} value={Math.round(it.grams)} inputMode="numeric" onChange={(e) => setGrams(i, Number(e.target.value.replace(/\D/g, '')) || 0)} />
+              <label className="mi-field"><span>Grams</span><input className="input sm num" style={{ width: 84 }} value={Math.round(it.grams)} inputMode="numeric" onChange={(e) => setGrams(i, Number(e.target.value.replace(/\D/g, '')) || 0)} /></label>
               {(['kcal', 'protein', 'carbs', 'fat'] as const).map((k) => (
-                <input key={k} className="input sm num" style={{ width: k === 'kcal' ? 64 : 52, padding: '0 4px' }} value={Math.round(it[k] * (k === 'kcal' ? 1 : 10)) / (k === 'kcal' ? 1 : 10)} inputMode="decimal"
-                  onChange={(e) => update(i, { [k]: parseFloat(e.target.value) || 0 })} />
+                <label key={k} className="mi-field"><span>{k === 'kcal' ? 'kcal' : k[0].toUpperCase() + k.slice(1)}</span><input className="input sm num" style={{ width: k === 'kcal' ? 64 : 52, padding: '0 4px' }} value={Math.round(it[k] * (k === 'kcal' ? 1 : 10)) / (k === 'kcal' ? 1 : 10)} inputMode="decimal"
+                  onChange={(e) => update(i, { [k]: parseFloat(e.target.value.replace(',', '.')) || 0 })} /></label>
               ))}
               <IconButton label="Remove item" className="sm" onClick={() => setItems((x) => x.filter((_, j) => j !== i))}><X size={14} /></IconButton>
             </motion.div>

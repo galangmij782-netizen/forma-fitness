@@ -74,10 +74,10 @@ function Lifts() {
       </motion.div>
 
       <div className="col" style={{ gap: 16 }}>
-        <div className="grid g-3">
+        <div className="grid g-3 keep-3 pr-grid">
           {prs.map((p, i) => (
             <Card key={p.kind + exId} transition={{ delay: i * 0.05 }}>
-              <div className="row between"><div className="label">{p.kind === 'e1rm' ? 'Best est. 1RM' : p.kind === 'weight' ? 'Heaviest set' : 'Best session volume'}</div><Trophy size={14} className="accent" /></div>
+              <div className="row between"><div className="label">{p.kind === 'e1rm' ? 'Est. 1RM' : p.kind === 'weight' ? 'Heaviest set' : 'Best volume'}</div><Trophy size={14} className="accent" /></div>
               <div className="t-xl w-600" style={{ marginTop: 6 }}><CountUp value={u.toDisplay(p.value)} decimals={p.kind === 'volume' ? 0 : 1} /> <span className="t-sm muted">{u.unit}</span></div>
               <div className="t-xs faint">{p.kind === 'volume' ? p.detail : p.kind === 'weight' ? p.detail : `${+u.toDisplay(+p.detail.split(' × ')[0]).toFixed(1)} × ${p.detail.split(' × ')[1]}`} · {fmtDay(p.date, { month: 'short', day: 'numeric' })}</div>
             </Card>

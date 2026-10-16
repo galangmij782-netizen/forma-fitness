@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react'
 import { useQuery } from './db'
 import { addDays, today } from './dates'
 import { effectiveTargets } from './nutrition'
@@ -20,4 +21,17 @@ export function useDayTotals(date = today()) {
 
 export function useWeekTotals(end = addDays(today(), -1)) {
   return useQuery(() => dayTotals(addDays(end, -6), end), [end])
+}
+
+/** True at phone widths (matches the CSS breakpoint for the bottom tab bar). */
+export function useIsPhone() {
+  const q = '(max-width: 820px)'
+  const [m, setM] = useState(() => typeof matchMedia !== 'undefined' && matchMedia(q).matches)
+  useEffect(() => {
+    const mq = matchMedia(q)
+    const on = () => setM(mq.matches)
+    mq.addEventListener('change', on)
+    return () => mq.removeEventListener('change', on)
+  }, [])
+  return m
 }

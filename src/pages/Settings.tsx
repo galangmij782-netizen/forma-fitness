@@ -57,14 +57,14 @@ function GoalCard() {
 
   return (
     <Section title="Goal phase" sub="Your phase sets daily calories and macros from your body stats.">
-      <div className="grid stack-md" style={{ gridTemplateColumns: 'repeat(5, 1fr)', gap: 10, marginBottom: 24 }}>
+      <div className="grid phase-grid" style={{ gridTemplateColumns: 'repeat(5, 1fr)', gap: 10, marginBottom: 24 }}>
         {(Object.keys(PHASES) as Phase[]).map((k) => (
           <motion.button key={k} onClick={() => saveProfile({ phase: k })} whileHover={{ y: -2 }} whileTap={{ scale: 0.97 }} transition={spring}
             className="card flat pad-sm" style={{ textAlign: 'left', position: 'relative', padding: 14 }}>
             {p.phase === k && <motion.div layoutId="phase-ring" transition={spring} style={{ position: 'absolute', inset: 0, borderRadius: 20, boxShadow: '0 0 0 1.5px var(--accent)', background: 'var(--accent-soft)' }} />}
             <div style={{ position: 'relative' }}>
               <div className="w-600 t-sm">{PHASES[k].label}</div>
-              <div className="t-xs muted" style={{ marginTop: 4, minHeight: 34 }}>{PHASES[k].blurb}</div>
+              <div className="t-xs muted phase-blurb" style={{ marginTop: 4, minHeight: 34 }}>{PHASES[k].blurb}</div>
               <div className="t-xs faint num" style={{ marginTop: 8 }}>{PHASES[k].adjust > 0 ? '+' : ''}{Math.round(PHASES[k].adjust * 100)}% kcal</div>
             </div>
           </motion.button>

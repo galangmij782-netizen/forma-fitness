@@ -36,6 +36,7 @@ export function RestTimerProvider({ children }: { children: ReactNode }) {
   const progress = useMotionValue(0)
   const anim = useRef<ReturnType<typeof animate> | null>(null)
   const reduce = useReducedMotion()
+  const dismiss = useRef<ReturnType<typeof setTimeout>>()
 
   const run = useCallback((s: TimerState) => {
     anim.current?.stop()
@@ -46,6 +47,7 @@ export function RestTimerProvider({ children }: { children: ReactNode }) {
 
   const start = useCallback((seconds: number, label: string) => {
     const s = { total: seconds, endsAt: Date.now() + seconds * 1000, label, paused: null }
+    clearTimeout(dismiss.current)
     setDone(false)
     setState(s)
     run(s)
@@ -53,18 +55,22 @@ export function RestTimerProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     if (!state || state.paused !== null) return
+    let t: ReturnType<typeof setInterval> | undefined
     const tick = () => {
       const remaining = Math.ceil((state.endsAt - Date.now()) / 1000)
       setLeft(Math.max(0, remaining))
       if (reduce) progress.jump(Math.max(0, (state.endsAt - Date.now()) / 1000 / state.total))
       if (remaining <= 0) {
+        // Chime once, then hide; a timer started meanwhile cancels the hide.
+        clearInterval(t)
         setDone(true)
         chime()
-        setTimeout(() => { setState(null); setDone(false) }, 2600)
+        dismiss.current = setTimeout(() => { setState(null); setDone(false) }, 2600)
+        return true
       }
     }
-    tick()
-    const t = setInterval(tick, 200)
+    if (tick()) return
+    t = setInterval(tick, 200)
     return () => clearInterval(t)
   }, [state, reduce, progress])
 
@@ -83,7 +89,7 @@ export function RestTimerProvider({ children }: { children: ReactNode }) {
       setState(s); run(s)
     }
   }
-  const skip = () => { anim.current?.stop(); setState(null); setDone(false) }
+  const skip = () => { anim.current?.stop(); clearTimeout(dismiss.current); setState(null); setDone(false) }
 
   return (
     <Ctx.Provider value={{ start, state }}>

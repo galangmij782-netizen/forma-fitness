@@ -226,12 +226,12 @@ function SetLine({ idx, logged, prev, lastLogged, target, step, toDisplay, onLog
     <motion.div layout className="row" style={{ gap: 12, padding: '6px', borderRadius: 12, background: isDone ? 'var(--accent-soft)' : 'transparent', transition: 'background-color .25s' }}>
       <span className="num w-600 t-sm" style={{ width: 34, textAlign: 'center', color: isDone ? 'var(--accent)' : 'var(--text-3)' }}>{idx + 1}</span>
       <span className="t-sm faint num hide-md" style={{ width: 96 }}>{prev ? `${+toDisplay(prev.weight).toFixed(1)} × ${prev.reps}` : '—'}</span>
-      <input className="input sm num" style={{ width: 110 }} value={w} disabled={isDone} inputMode="decimal" onChange={(e) => setW(e.target.value)} onKeyDown={(e) => e.key === 'ArrowUp' ? setW(String(+(parseFloat(w || '0') + step).toFixed(2))) : e.key === 'ArrowDown' ? setW(String(Math.max(0, +(parseFloat(w || '0') - step).toFixed(2)))) : null} />
+      <input className="input sm num" style={{ width: 110 }} value={w} disabled={isDone} inputMode="decimal" onChange={(e) => setW(e.target.value.replace(/[^0-9.,]/g, ''))} onKeyDown={(e) => e.key === 'ArrowUp' ? setW(String(+(parseFloat(w || '0') + step).toFixed(2))) : e.key === 'ArrowDown' ? setW(String(Math.max(0, +(parseFloat(w || '0') - step).toFixed(2)))) : null} />
       <input className="input sm num" style={{ width: 90 }} value={r} disabled={isDone} inputMode="numeric" onChange={(e) => setR(e.target.value.replace(/\D/g, ''))} />
       <span className="grow t-xs" style={{ color: missed ? 'var(--warn)' : 'var(--text-3)' }}>{missed ? `Below ${target[0]} reps` : ''}</span>
       <motion.button whileHover={{ scale: 1.06 }} whileTap={{ scale: 0.88 }} transition={spring}
         aria-label={isDone ? 'Undo set' : 'Log set'}
-        onClick={() => (isDone ? deleteSet(logged!.id) : onLog(idx, parseFloat(w) || 0, parseInt(r) || 0))}
+        onClick={() => (isDone ? deleteSet(logged!.id) : (parseInt(r) > 0 ? onLog(idx, parseFloat(w.replace(',', '.')) || 0, parseInt(r)) : setR(String(target[1]))))}
         style={{ width: 36, height: 36, borderRadius: 11, display: 'grid', placeItems: 'center', background: isDone ? 'var(--accent)' : 'var(--surface-2)', color: isDone ? 'var(--accent-ink)' : 'var(--text-3)', boxShadow: 'var(--shadow-sm)' }}>
         <motion.span key={String(isDone)} initial={{ scale: 0.4, rotate: -30 }} animate={{ scale: 1, rotate: 0 }} transition={{ type: 'spring', stiffness: 500, damping: 18 }} style={{ display: 'grid' }}>
           <Check size={17} strokeWidth={2.6} />
