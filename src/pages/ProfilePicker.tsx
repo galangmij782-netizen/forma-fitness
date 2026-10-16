@@ -20,7 +20,7 @@ export function ProfilePicker({ onUnlocked }: { onUnlocked: (p: ProfileInfo) => 
 
   if (!profiles) return null
   return (
-    <div style={{ height: '100%', display: 'grid', placeItems: 'center', padding: 40, background: 'radial-gradient(1200px 600px at 50% -10%, var(--accent-soft), transparent 60%)' }}>
+    <div style={{ height: '100%', display: 'grid', placeItems: 'center', padding: 'clamp(16px, 5vw, 40px)', background: 'radial-gradient(1200px 600px at 50% -10%, var(--accent-soft), transparent 60%)' }}>
       <AnimatePresence mode="wait">
         {mode === 'pick' && (
           <motion.div key="pick" variants={stagger} initial="hidden" animate="show" exit={{ opacity: 0, y: -10 }} style={{ textAlign: 'center' }}>
@@ -69,7 +69,7 @@ function CreateProfile({ canBack, onBack, onCreated }: { canBack: boolean; onBac
     onCreated(await platform.profiles.create({ name, color, pin: pin || undefined }))
   }
   return (
-    <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} transition={softSpring} className="card" style={{ width: 420, padding: 32 }}>
+    <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} transition={softSpring} className="card" style={{ width: 'min(420px, calc(100vw - 32px))', maxWidth: '100%', padding: 'clamp(20px, 6vw, 32px)' }}>
       {canBack && <Button variant="ghost" size="sm" onClick={onBack} style={{ marginLeft: -10, marginBottom: 12 }}><ArrowLeft size={15} /> Back</Button>}
       <h1 className="page-title" style={{ fontSize: 24 }}>Create your profile</h1>
       <p className="page-sub t-sm" style={{ marginBottom: 28 }}>Your data stays on this device, separate from other profiles.</p>

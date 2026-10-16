@@ -9,6 +9,7 @@ import { useSession } from '../lib/nav'
 import { ACTIVITY, PHASES, computeTargets } from '../lib/nutrition'
 import { platform, type KeyStatus } from '../lib/platform'
 import { saveProfile } from '../lib/repo'
+import { ALARM_SOUNDS, getAlarmSound, playAlarm, setAlarmSound, stopAlarm, unlockAudio, type AlarmSound } from '../lib/alarm'
 import { loadSampleData } from '../lib/sample'
 import type { Activity, Phase } from '../lib/types'
 
@@ -27,6 +28,7 @@ export function Settings() {
       <div className="col" style={{ gap: 16 }}>
         <GoalCard />
         <AppearanceCard />
+        <AlarmCard />
         <PhotoCard />
         <ProfileCard />
         <DataCard />
@@ -120,6 +122,18 @@ function AppearanceCard() {
           </div></div>
         <div className="field"><span className="label">Units</span>
           <Segmented value={t.profile.units} onChange={(v) => saveProfile({ units: v })} options={[{ value: 'kg', label: 'kg' }, { value: 'lb', label: 'lb' }]} /></div>
+      </div>
+    </Section>
+  )
+}
+
+function AlarmCard() {
+  const [sound, setSound] = useState<AlarmSound>(getAlarmSound())
+  return (
+    <Section title="Rest alarm" sub="Plays when your rest is over. On iPhone keep the app open; the screen stays on during a workout.">
+      <div className="row wrap" style={{ gap: 12 }}>
+        <Segmented value={sound} onChange={(v) => { setSound(v); setAlarmSound(v); unlockAudio(); if (v !== 'off') playAlarm(v); setTimeout(stopAlarm, 2200) }} options={ALARM_SOUNDS} />
+        <span className="t-xs faint">Tap a sound to hear it.</span>
       </div>
     </Section>
   )

@@ -1,5 +1,6 @@
 import { all, get, getSetting, run, setSetting, tx } from './db'
 import { addDays, nowTime, today } from './dates'
+import type { ProgramDay } from './programText'
 import type { DayExercise, Exercise, Food, Meal, MealItem, MuscleGroup, Profile, Session, SetRow, Split, SplitDay, WeightEntry } from './types'
 import type { DayTotals } from './insights'
 
@@ -14,7 +15,8 @@ export const saveProfile = (patch: Partial<Profile>) => setSetting('profile', { 
 // ---------- exercises ----------
 export const listExercises = () => all<Exercise>('SELECT * FROM exercises ORDER BY name')
 export function ensureExercise(name: string, muscle: MuscleGroup): number {
-  const found = get<{ id: number }>('SELECT id FROM exercises WHERE name = ?', [name.trim()])
+  const n = name.trim()
+  const found = get<{ id: number }>('SELECT id FROM exercises WHERE lower(name) = lower(?) OR lower(name) = lower(?)', [n, n.replace(/s$/i, '')])
   if (found) return found.id
   return run('INSERT INTO exercises(name, muscle) VALUES(?, ?)', [name.trim(), muscle])
 }
@@ -75,6 +77,21 @@ export function createSplit(templateKey: string | null, name?: string): number {
       const did = exec('INSERT INTO split_days(split_id, name, position) VALUES(?, ?, ?)', [sid, d.name, i])
       d.ex.forEach(([n, , sets, rmin, rmax, rest], j) =>
         exec('INSERT INTO day_exercises(day_id, exercise_id, position, sets, reps_min, reps_max, rest_sec) VALUES(?,?,?,?,?,?,?)', [did, exIds.get(n)!, j, sets, rmin, rmax, rest]))
+    })
+    return sid
+  })
+}
+
+/** Creates a split from a parsed program (see programText.ts). */
+export function createSplitFromProgram(name: string, days: ProgramDay[]): number {
+  const ids = days.map((d) => d.exercises.map((e) => ensureExercise(e.name, e.muscle)))
+  const pos = get<{ m: number }>('SELECT COALESCE(MAX(position), -1) + 1 AS m FROM splits')?.m ?? 0
+  return tx((exec) => {
+    const sid = exec('INSERT INTO splits(name, description, position, created_at) VALUES(?, ?, ?, ?)', [name, '', pos, new Date().toISOString()])
+    days.forEach((d, i) => {
+      const did = exec('INSERT INTO split_days(split_id, name, position) VALUES(?, ?, ?)', [sid, d.name, i])
+      d.exercises.forEach((e, j) =>
+        exec('INSERT INTO day_exercises(day_id, exercise_id, position, sets, reps_min, reps_max, rest_sec) VALUES(?,?,?,?,?,?,?)', [did, ids[i][j], j, e.sets, e.repsMin, e.repsMax, e.rest]))
     })
     return sid
   })

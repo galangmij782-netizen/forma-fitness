@@ -2,30 +2,13 @@ import { AnimatePresence, animate, motion, useMotionValue, useReducedMotion } fr
 import { Pause, Play, SkipForward, Timer } from 'lucide-react'
 import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from 'react'
 import { Ring } from './Ring'
+import { notify, playAlarm, stopAlarm } from '../lib/alarm'
 import { IconButton, softSpring, spring } from './ui'
 
 interface TimerState { total: number; endsAt: number; label: string; paused: number | null }
-interface TimerApi { start(seconds: number, label: string): void; state: TimerState | null }
-const Ctx = createContext<TimerApi>({ start: () => {}, state: null })
+interface TimerApi { start(seconds: number, label: string): void; skip(): void; state: TimerState | null }
+const Ctx = createContext<TimerApi>({ start: () => {}, skip: () => {}, state: null })
 export const useRestTimer = () => useContext(Ctx)
-
-/** Soft two-note chime, quiet enough not to startle. */
-function chime() {
-  try {
-    const ac = new AudioContext()
-    ;[659.25, 987.77].forEach((f, i) => {
-      const o = ac.createOscillator(), g = ac.createGain()
-      o.type = 'sine'; o.frequency.value = f
-      const t = ac.currentTime + i * 0.16
-      g.gain.setValueAtTime(0, t)
-      g.gain.linearRampToValueAtTime(0.12, t + 0.03)
-      g.gain.exponentialRampToValueAtTime(0.0001, t + 0.9)
-      o.connect(g).connect(ac.destination)
-      o.start(t); o.stop(t + 1)
-    })
-    setTimeout(() => ac.close(), 1500)
-  } catch { /* audio unavailable */ }
-}
 
 const fmt = (s: number) => `${Math.floor(s / 60)}:${String(Math.max(0, s % 60)).padStart(2, '0')}`
 
@@ -48,6 +31,7 @@ export function RestTimerProvider({ children }: { children: ReactNode }) {
   const start = useCallback((seconds: number, label: string) => {
     const s = { total: seconds, endsAt: Date.now() + seconds * 1000, label, paused: null }
     clearTimeout(dismiss.current)
+    stopAlarm()
     setDone(false)
     setState(s)
     run(s)
@@ -64,8 +48,9 @@ export function RestTimerProvider({ children }: { children: ReactNode }) {
         // Chime once, then hide; a timer started meanwhile cancels the hide.
         clearInterval(t)
         setDone(true)
-        chime()
-        dismiss.current = setTimeout(() => { setState(null); setDone(false) }, 2600)
+        playAlarm()
+        void notify('Rest is over', state.label.replace(/^.*·\s*/, '') || 'Time for your next set')
+        dismiss.current = setTimeout(() => { setState(null); setDone(false) }, 9000)
         return true
       }
     }
@@ -89,10 +74,10 @@ export function RestTimerProvider({ children }: { children: ReactNode }) {
       setState(s); run(s)
     }
   }
-  const skip = () => { anim.current?.stop(); clearTimeout(dismiss.current); setState(null); setDone(false) }
+  const skip = () => { anim.current?.stop(); stopAlarm(); clearTimeout(dismiss.current); setState(null); setDone(false) }
 
   return (
-    <Ctx.Provider value={{ start, state }}>
+    <Ctx.Provider value={{ start, skip, state }}>
       {children}
       <AnimatePresence>
         {state && (
@@ -100,7 +85,8 @@ export function RestTimerProvider({ children }: { children: ReactNode }) {
             initial={{ opacity: 0, y: 30, scale: 0.94 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: 20, scale: 0.96 }} transition={softSpring}
             className="rest-timer" style={{ position: 'fixed', right: 32, bottom: 32, zIndex: 90 }}>
             <motion.div className="card" style={{ padding: 18, display: 'flex', alignItems: 'center', gap: 18, background: 'var(--surface-solid)', boxShadow: 'var(--shadow-lg)' }}
-              animate={done && !reduce ? { scale: [1, 1.04, 1] } : { scale: 1 }} transition={{ duration: 0.6, ease: 'easeOut' }}>
+              animate={done && !reduce ? { scale: [1, 1.04, 1] } : { scale: 1 }} transition={done ? { duration: 0.6, ease: 'easeOut', repeat: 6, repeatDelay: 0.6 } : { duration: 0.3 }}
+              onClick={done ? skip : undefined}>
               <div style={{ position: 'relative' }}>
                 <AnimatePresence>
                   {done && <motion.div initial={{ opacity: 0.6, scale: 1 }} animate={{ opacity: 0, scale: 1.6 }} transition={{ duration: 1.2, ease: 'easeOut' }}
@@ -115,7 +101,7 @@ export function RestTimerProvider({ children }: { children: ReactNode }) {
               <div className="col" style={{ gap: 8, minWidth: 150 }}>
                 <div>
                   <div className="label row" style={{ gap: 6 }}><Timer size={12} /> Rest</div>
-                  <div className="w-600 t-sm" style={{ maxWidth: 180, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{done ? 'Time for your next set' : state.label}</div>
+                  <div className="w-600 t-sm" style={{ maxWidth: 180, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{done ? 'Time for your next set · tap to stop' : state.label}</div>
                 </div>
                 <div className="row" style={{ gap: 4 }}>
                   <motion.button className="btn sm" whileTap={{ scale: 0.94 }} transition={spring} onClick={() => adjust(-15)}>−15s</motion.button>

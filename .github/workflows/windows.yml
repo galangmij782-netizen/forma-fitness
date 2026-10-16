@@ -1,7 +1,7 @@
 name: Windows installer
 on:
   push:
-    tags: ['v*']
+    branches: [main]
   workflow_dispatch:
 permissions:
   contents: write
@@ -22,9 +22,12 @@ jobs:
           path: |
             release/*.exe
             release/*.zip
-      - if: startsWith(github.ref, 'refs/tags/')
-        uses: softprops/action-gh-release@v2
+      # Every build on main becomes the latest release, which the app's update banner links to.
+      - uses: softprops/action-gh-release@v2
         with:
-          files: |
-            release/*.exe
-            release/*.zip
+          tag_name: build-${{ github.run_number }}
+          name: Forma for Windows (build ${{ github.run_number }})
+          target_commitish: ${{ github.sha }}
+          make_latest: true
+          body: Download Forma-Setup and run it. It installs over your current version and keeps your data.
+          files: release/Forma-Setup-*.exe

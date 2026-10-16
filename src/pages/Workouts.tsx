@@ -1,5 +1,5 @@
 import { AnimatePresence, motion } from 'motion/react'
-import { Check, ChevronDown, Clock, Dumbbell, Flag, Plus, Timer, Trash2, Trophy } from 'lucide-react'
+import { Check, ChevronDown, Clock, Dumbbell, Flag, Play, Plus, Square, Timer, Trash2, Trophy } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { useCelebrate } from '../components/Celebrate'
 import { useRestTimer } from '../components/RestTimer'
@@ -14,6 +14,15 @@ import {
 import { isNewPR } from '../lib/training'
 import type { DayExercise, SetRow } from '../lib/types'
 import { useUnits } from '../lib/units'
+import { askNotifyPermission, stopAlarm, unlockAudio, useWakeLock } from '../lib/alarm'
+
+type Running = { exerciseId: number; idx: number; startedAt: number } | null
+const clock = (s: number) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`
+function useTicker(on: boolean) {
+  const [now, setNow] = useState(Date.now())
+  useEffect(() => { if (!on) return; setNow(Date.now()); const t = setInterval(() => setNow(Date.now()), 250); return () => clearInterval(t) }, [on])
+  return now
+}
 
 export function Workouts() {
   const { params, go } = useNav()
@@ -133,6 +142,8 @@ function LiveSession({ sessionId }: { sessionId: number }) {
   }, [sessionId])
   const elapsed = useElapsed(data?.s.started_at ?? new Date().toISOString())
   const u = useUnits()
+  const [running, setRunning] = useState<Running>(null)
+  useWakeLock(!!data)
   if (!data) return null
   const { s, ex, sets } = data
   const done = sets.length
@@ -152,13 +163,13 @@ function LiveSession({ sessionId }: { sessionId: number }) {
         <div className="card flat pad-sm"><div className="label">Exercises</div><div className="t-lg w-600"><CountUp value={new Set(sets.map((x) => x.exercise_id)).size} /> <span className="t-sm muted">/ {ex.length}</span></div></div>
       </motion.div>
       <div className="col" style={{ gap: 14 }}>
-        {ex.map((e) => <ExerciseLog key={e.id} sessionId={s.id} e={e} logged={sets.filter((x) => x.exercise_id === e.exercise_id)} />)}
+        {ex.map((e) => <ExerciseLog key={e.id} sessionId={s.id} e={e} logged={sets.filter((x) => x.exercise_id === e.exercise_id)} running={running} setRunning={setRunning} />)}
       </div>
     </motion.div>
   )
 }
 
-function ExerciseLog({ sessionId, e, logged }: { sessionId: number; e: DayExercise; logged: SetRow[] }) {
+function ExerciseLog({ sessionId, e, logged, running, setRunning }: { sessionId: number; e: DayExercise; logged: SetRow[]; running: Running; setRunning: (r: Running) => void }) {
   const u = useUnits()
   const timer = useRestTimer()
   const celebrate = useCelebrate()
@@ -166,6 +177,22 @@ function ExerciseLog({ sessionId, e, logged }: { sessionId: number; e: DayExerci
   const [extra, setExtra] = useState(0)
   const rows = Math.max(e.sets + extra, logged.length)
   const complete = logged.length >= e.sets
+  const values = useRef<Record<number, () => { w: number; r: number }>>({})
+  let nextIdx = 0
+  while (logged.some((x) => x.set_index === nextIdx)) nextIdx++
+  const mine = running?.exerciseId === e.exercise_id ? running : null
+  const now = useTicker(!!mine)
+  const startSet = () => {
+    unlockAudio(); stopAlarm(); askNotifyPermission()
+    if (timer.state) timer.skip()
+    setRunning({ exerciseId: e.exercise_id, idx: nextIdx, startedAt: Date.now() })
+  }
+  const finishSet = () => {
+    if (!mine) return
+    const v = values.current[mine.idx]?.() ?? { w: 0, r: e.reps_max }
+    setRunning(null)
+    onLog(mine.idx, v.w, v.r > 0 ? v.r : e.reps_max)
+  }
 
   const onLog = (idx: number, weightDisplay: number, reps: number) => {
     const kg = Math.round(u.fromDisplay(weightDisplay) * 100) / 100
@@ -203,32 +230,44 @@ function ExerciseLog({ sessionId, e, logged }: { sessionId: number; e: DayExerci
       <div className="col" style={{ gap: 4 }}>
         {Array.from({ length: rows }, (_, i) => (
           <SetLine key={i} idx={i} logged={logged.find((x) => x.set_index === i)} prev={last[i]} lastLogged={logged[logged.length - 1]}
-            target={[e.reps_min, e.reps_max]} step={u.step} toDisplay={u.toDisplay} onLog={onLog} />
+            target={[e.reps_min, e.reps_max]} step={u.step} toDisplay={u.toDisplay} onLog={onLog} active={mine?.idx === i}
+            register={(get) => { values.current[i] = get }} />
         ))}
       </div>
-      <Button size="sm" variant="ghost" style={{ marginTop: 6 }} onClick={() => setExtra(extra + 1)}><Plus size={14} /> Add set</Button>
+      <div className="row set-actions" style={{ marginTop: 10, gap: 8 }}>
+        {(!complete || mine) && (
+          <motion.button layout className={`btn ${mine ? 'set-running' : 'primary'} grow`} whileTap={{ scale: 0.97 }} transition={spring} onClick={mine ? finishSet : startSet}>
+            {mine
+              ? <><Square size={15} fill="currentColor" /> Finish set {mine.idx + 1} <span className="num" style={{ marginLeft: 'auto' }}>{clock(Math.floor((now - mine.startedAt) / 1000))}</span></>
+              : <><Play size={15} fill="currentColor" /> Start set {nextIdx + 1}</>}
+          </motion.button>
+        )}
+        <Button size="sm" variant="ghost" onClick={() => setExtra(extra + 1)}><Plus size={14} /> Add set</Button>
+      </div>
     </Card>
   )
 }
 
-function SetLine({ idx, logged, prev, lastLogged, target, step, toDisplay, onLog }: {
+function SetLine({ idx, logged, prev, lastLogged, target, step, toDisplay, onLog, active, register }: {
   idx: number; logged?: SetRow; prev?: SetRow; lastLogged?: SetRow; target: [number, number]; step: number
   toDisplay: (kg: number) => number; onLog: (idx: number, w: number, reps: number) => void
+  active?: boolean; register: (get: () => { w: number; r: number }) => void
 }) {
   const seedW = logged?.weight ?? lastLogged?.weight ?? prev?.weight ?? 0
   const [w, setW] = useState(String(+toDisplay(seedW).toFixed(2)))
   const [r, setR] = useState(String(logged?.reps ?? prev?.reps ?? target[1]))
   useEffect(() => { if (!logged && lastLogged) setW(String(+toDisplay(lastLogged.weight).toFixed(2))) }, [lastLogged?.id])
+  register(() => ({ w: parseFloat(w.replace(',', '.')) || 0, r: parseInt(r) || 0 }))
   const isDone = !!logged
   const missed = logged && logged.reps < target[0]
 
   return (
-    <motion.div layout className="row" style={{ gap: 12, padding: '6px', borderRadius: 12, background: isDone ? 'var(--accent-soft)' : 'transparent', transition: 'background-color .25s' }}>
+    <motion.div layout className="row" style={{ gap: 12, padding: '6px', borderRadius: 12, background: isDone ? 'var(--accent-soft)' : 'transparent', boxShadow: active ? 'inset 0 0 0 1.5px var(--accent)' : 'none', transition: 'background-color .25s, box-shadow .25s' }}>
       <span className="num w-600 t-sm" style={{ width: 34, textAlign: 'center', color: isDone ? 'var(--accent)' : 'var(--text-3)' }}>{idx + 1}</span>
       <span className="t-sm faint num hide-md" style={{ width: 96 }}>{prev ? `${+toDisplay(prev.weight).toFixed(1)} × ${prev.reps}` : '—'}</span>
       <input className="input sm num" style={{ width: 110 }} value={w} disabled={isDone} inputMode="decimal" onChange={(e) => setW(e.target.value.replace(/[^0-9.,]/g, ''))} onKeyDown={(e) => e.key === 'ArrowUp' ? setW(String(+(parseFloat(w || '0') + step).toFixed(2))) : e.key === 'ArrowDown' ? setW(String(Math.max(0, +(parseFloat(w || '0') - step).toFixed(2)))) : null} />
       <input className="input sm num" style={{ width: 90 }} value={r} disabled={isDone} inputMode="numeric" onChange={(e) => setR(e.target.value.replace(/\D/g, ''))} />
-      <span className="grow t-xs" style={{ color: missed ? 'var(--warn)' : 'var(--text-3)' }}>{missed ? `Below ${target[0]} reps` : ''}</span>
+      <span className="grow t-xs" style={{ color: missed ? 'var(--warn)' : active ? 'var(--accent)' : 'var(--text-3)' }}>{missed ? `Below ${target[0]} reps` : ''}</span>
       <motion.button whileHover={{ scale: 1.06 }} whileTap={{ scale: 0.88 }} transition={spring}
         aria-label={isDone ? 'Undo set' : 'Log set'}
         onClick={() => (isDone ? deleteSet(logged!.id) : (parseInt(r) > 0 ? onLog(idx, parseFloat(w.replace(',', '.')) || 0, parseInt(r)) : setR(String(target[1]))))}

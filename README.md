@@ -12,6 +12,18 @@ To install it on a second laptop, copy the same zip over and repeat the steps. E
 ## iPhone and iPad
 Open the GitHub Pages link in Safari, tap Share, then "Add to Home Screen". It runs full screen and keeps its data on the device.
 
+## Typing your program
+
+In Splits, tap **Type your program** and write it like a note: a day name on its own line (Push, Day 1, Monday), then one exercise per line such as `Incline bench press 3x8-12` or `Lateral raises 3 sets of 15, rest 60s`. The preview shows each day as you type, and Create split adds it to Splits.
+
+## Timed sets and rest alarm
+
+During a workout, tap **Start set** before you lift and **Finish set** when you rack it. The set is logged and the rest countdown starts. When rest ends, an alarm rings (Ring, Beep, Soft or Off in Settings) and the phone vibrates where supported. The screen stays on during a workout. On iPhone, the alarm only plays while the app is open.
+
+## Updates
+
+The web app checks for a new version when it opens and shows a banner. Tap Update now and it reloads with your data intact. The Windows app shows the same banner with a link to the newest installer on the Releases page.
+
 ## Logging meals by typing (free, offline)
 On Meals, type what you ate, e.g. `2 medium eggs scrambled, 1 tbsp butter, 1 mug coffee`. Calories and macros fill in as you type, from a built-in list of about 150 common and Filipino foods. If a food isn't in the list, tap it to enter its calories once and it's remembered next time.
 

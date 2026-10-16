@@ -3,6 +3,7 @@ import { Activity, CalendarRange, Dumbbell, LayoutGrid, LineChart, Settings as C
 import { useCallback, useEffect, useState } from 'react'
 import { CelebrateProvider } from './components/Celebrate'
 import { RestTimerProvider } from './components/RestTimer'
+import { UpdateBanner } from './components/UpdateBanner'
 import { ToastProvider, spring } from './components/ui'
 import { closeDatabase, flush, useDbReady, useQuery } from './lib/db'
 import { NavCtx, SessionCtx, useSession, type PageKey } from './lib/nav'
@@ -68,6 +69,7 @@ export default function App() {
   return (
     <MotionConfig reducedMotion="user">
       <div className="drag" />
+      <UpdateBanner />
       <AnimatePresence mode="wait">
         {!profile || !ready ? (
           <motion.div key="picker" style={{ height: '100%' }} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0, transition: { duration: 0.15 } }}>
