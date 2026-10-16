@@ -141,9 +141,9 @@ function Body() {
   return (
     <div className="col" style={{ gap: 16 }}>
       <div className="grid g-4">
-        <Card>
-          <div className="label">Log today</div>
-          <div className="row" style={{ marginTop: 10, gap: 8 }}>
+        <Card className="log-card">
+          <div className="label">Log today's weight ({u.unit})</div>
+          <div className="row log-row" style={{ marginTop: 10, gap: 8 }}>
             <Stepper value={current} step={0.1} min={20} max={400} onChange={setVal} />
             <Button variant="primary" size="sm" onClick={() => { logWeight(today(), u.fromDisplay(current)); setVal(null) }}>Save</Button>
           </div>
@@ -154,9 +154,10 @@ function Body() {
           <div className="t-xl w-600" style={{ marginTop: 6 }}>{rate ? <><CountUp value={rate.pctPerWeek} decimals={2} prefix={rate.pctPerWeek >= 0 ? '+' : ''} /><span className="t-sm muted">%</span></> : '—'}</div>
           <div className="t-xs muted num">{rate ? `${rate.kgPerWeek >= 0 ? '+' : ''}${u.toDisplay(rate.kgPerWeek).toFixed(2)} ${u.unit} a week` : 'Needs a week of data'}</div>
         </Card>
-        <Card>
+        <Card className="log-card">
           <div className="label">{phase.label} expects</div>
-          <div className="t-xl w-600" style={{ marginTop: 6 }}>{phase.rate[0] > 0 ? '+' : ''}{phase.rate[0]} to {phase.rate[1] > 0 ? '+' : ''}{phase.rate[1]}<span className="t-sm muted">%</span></div>
+          <div className="t-lg w-600 num" style={{ marginTop: 6 }}>{phase.rate[0] > 0 ? '+' : ''}{phase.rate[0]} to {phase.rate[1] > 0 ? '+' : ''}{phase.rate[1]}<span className="t-sm muted">%</span></div>
+          <div className="t-xs muted">of body weight a week</div>
           {rate && <span className={`chip ${inRange ? 'accent' : 'warn'}`} style={{ marginTop: 4 }}>{inRange ? 'On pace' : rate.pctPerWeek > phase.rate[1] ? 'Faster than planned' : 'Slower than planned'}</span>}
         </Card>
       </div>
