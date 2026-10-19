@@ -3,13 +3,24 @@
 import { FOODS, type BuiltinFood, type UnitKey } from './foodDb'
 import type { Food, MealItem } from './types'
 
+export interface Suggestion { kind: 'builtin' | 'saved'; name: string; id?: number }
+
 export interface ParsedLine {
   text: string
   item: MealItem | null
   /** how the portion was read, e.g. "2 medium (88 g)" */
   portion: string
   assumed: boolean
+  /** some words of the entry were not explained by the food that matched ("shrimp sinigang" -> Shrimp) */
+  unsure?: boolean
+  /** other foods it might be, best first */
+  suggestions?: Suggestion[]
+  /** the food words of the entry, used to remember the user's pick */
+  key?: string
 }
+
+/** Foods the user picked for an entry before: food words -> food. */
+export type Learned = Record<string, Suggestion>
 
 const NUM_WORDS: Record<string, number> = {
   a: 1, an: 1, one: 1, isa: 1, isang: 1, two: 2, dalawa: 2, dalawang: 2, three: 3, tatlo: 3, tatlong: 3, four: 4, apat: 4, apat_na: 4,
@@ -75,19 +86,64 @@ export function readQuantity(entry: string): Quantity {
 
 type Candidate = { kind: 'builtin'; food: BuiltinFood; score: number } | { kind: 'saved'; food: Food; score: number }
 
-function bestMatch(rest: string[], saved: Food[]): Candidate | null {
-  const have = new Set(rest.map(stem))
-  if (!have.size) return null
-  let best: Candidate | null = null
-  const consider = (aliasWords: string[], make: (score: number) => Candidate) => {
-    if (!aliasWords.length || !aliasWords.every((w) => have.has(w))) return
-    // More matched words wins; a tie goes to the alias that leaves fewer words unexplained.
-    const score = aliasWords.length * 10 - (have.size - aliasWords.length) * 0.1
-    if (!best || score > best.score) best = make(score)
+// Cooking words that describe a dish without changing what it is; leaving them unexplained is fine.
+const SOFT = new Set(['cooked', 'homemade', 'plain', 'fresh', 'hot', 'warm', 'leftover', 'small', 'big', 'lutong', 'bahay', 'ulam', 'with', 'w', 'and', 'at', 'sa', 'yung', 'ung', 'lang', 'only', 'piece', 'style', 'grilled', 'inihaw', 'fried', 'prito', 'pritong', 'boiled', 'steamed', 'baked', 'roasted', 'sauteed', 'stir', 'fry'])
+
+const ALIAS_WORDS: { food: BuiltinFood; words: string[] }[] = FOODS.flatMap((f) => f.aliases.map((a) => ({ food: f, words: words(a) })).filter((a) => a.words.length))
+const VOCAB = new Set(ALIAS_WORDS.flatMap((a) => a.words))
+
+function editDistanceAtMost1(a: string, b: string) {
+  if (Math.abs(a.length - b.length) > 1) return false
+  let i = 0, j = 0, edits = 0
+  while (i < a.length && j < b.length) {
+    if (a[i] === b[j]) { i++; j++; continue }
+    if (++edits > 1) return false
+    if (a.length > b.length) i++; else if (b.length > a.length) j++; else { i++; j++ }
   }
-  for (const f of saved) consider(words(f.name), (score) => ({ kind: 'saved', food: f, score: score + 0.05 }))
-  for (const f of FOODS) for (const a of f.aliases) consider(words(a), (score) => ({ kind: 'builtin', food: f, score }))
-  return best
+  return edits + (a.length - i) + (b.length - j) <= 1
+}
+
+/** Maps a typed word onto the food vocabulary: Tagalog linkers ("tortang" -> torta, "adobong" -> adobo) and one-letter typos. */
+function normalize(w: string, vocab: Set<string>) {
+  if (vocab.has(w)) return w
+  for (const cut of [2, 1]) if (w.length > 4 && w.endsWith('ng') && vocab.has(w.slice(0, -cut))) return w.slice(0, -cut)
+  if (w.length >= 5) {
+    const near = [...vocab].filter((v) => v.length >= 4 && editDistanceAtMost1(w, v))
+    if (near.length === 1) return near[0]
+  }
+  return w
+}
+
+function bestMatch(rest: string[], saved: Food[]): { best: Candidate | null; suggestions: Suggestion[]; unsure: boolean; key: string } {
+  const savedWords = saved.map((f) => ({ food: f, words: words(f.name) }))
+  const vocab = new Set([...VOCAB, ...savedWords.flatMap((s) => s.words)])
+  const have = new Set(rest.map(stem).map((w) => normalize(w, vocab)))
+  const key = [...have].filter((w) => !SOFT.has(w)).sort().join(' ')
+  if (!have.size) return { best: null, suggestions: [], unsure: false, key }
+  const hard = [...have].filter((w) => !SOFT.has(w))
+  let best: Candidate | null = null
+  let bestMissing = 0
+  const partial: { s: Suggestion; score: number }[] = []
+  const consider = (aliasWords: string[], make: (score: number) => Candidate, sug: Suggestion) => {
+    const hit = aliasWords.filter((w) => have.has(w)).length
+    if (!hit) return
+    if (hit < aliasWords.length) {
+      partial.push({ s: sug, score: hit * 10 - (aliasWords.length - hit) * 4 - hard.length * 0.1 })
+      return
+    }
+    // More matched words wins; a tie goes to the alias that leaves fewer words unexplained.
+    const missing = hard.filter((w) => !aliasWords.includes(w)).length
+    const score = aliasWords.length * 10 - missing * 0.5
+    partial.push({ s: sug, score: score + 5 })
+    if (!best || score > best.score) { best = make(score); bestMissing = missing }
+  }
+  for (const f of savedWords) consider(f.words, (score) => ({ kind: 'saved', food: f.food, score: score + 0.05 }), { kind: 'saved', name: f.food.name, id: f.food.id })
+  for (const a of ALIAS_WORDS) consider(a.words, (score) => ({ kind: 'builtin', food: a.food, score }), { kind: 'builtin', name: a.food.name })
+  const chosen = best as Candidate | null
+  const seen = new Set<string>(chosen ? [chosen.food.name] : [])
+  const suggestions = partial.sort((a, b) => b.score - a.score).map((p) => p.s)
+    .filter((s) => (seen.has(s.name) ? false : (seen.add(s.name), true))).slice(0, 4)
+  return { best: chosen, suggestions, unsure: !!chosen && bestMissing > 0, key }
 }
 
 const r1 = (v: number) => Math.round(v * 10) / 10
@@ -124,9 +180,20 @@ function gramsFor(f: BuiltinFood, q: Quantity): { grams: number; label: string; 
 }
 
 /** Parse one typed entry. Returns item null when no food matched. */
-export function parseEntry(entry: string, saved: Food[] = []): ParsedLine {
+export function parseEntry(entry: string, saved: Food[] = [], learned: Learned = {}): ParsedLine {
   const q = readQuantity(entry)
-  const m = bestMatch(q.rest, saved)
+  const found = bestMatch(q.rest, saved)
+  const pick = found.key ? learned[found.key] : undefined
+  const picked: Candidate | null = pick
+    ? pick.kind === 'saved'
+      ? (() => { const f = saved.find((x) => x.id === pick.id || x.name === pick.name); return f ? { kind: 'saved' as const, food: f, score: 99 } : null })()
+      : (() => { const f = FOODS.find((x) => x.name === pick.name); return f ? { kind: 'builtin' as const, food: f, score: 99 } : null })()
+    : null
+  const line = parseWith(entry, q, picked ?? found.best)
+  return { ...line, key: found.key, unsure: picked ? false : found.unsure, suggestions: picked ? [] : found.suggestions }
+}
+
+function parseWith(entry: string, q: Quantity, m: Candidate | null): ParsedLine {
   if (!m) return { text: entry, item: null, portion: '', assumed: false }
   if (m.kind === 'saved') {
     const f = m.food
@@ -149,7 +216,7 @@ export function parseEntry(entry: string, saved: Food[] = []): ParsedLine {
   }
 }
 
-export const parseMeal = (text: string, saved: Food[] = []) => splitEntries(text).map((e) => parseEntry(e, saved))
+export const parseMeal = (text: string, saved: Food[] = [], learned: Learned = {}) => splitEntries(text).map((e) => parseEntry(e, saved, learned))
 
 /** Breakfast before 10:30, lunch until 15:00, snack until 17:30, dinner after. */
 export function mealForTime(hhmm: string) {

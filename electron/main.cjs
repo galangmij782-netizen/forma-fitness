@@ -140,21 +140,22 @@ ipcMain.handle('meal:analyze', async (_e, { id, imageBase64, mediaType, model, n
   const Anthropic = require('@anthropic-ai/sdk').default
   const client = new Anthropic({ apiKey, maxRetries: 2, timeout: 120_000 })
   const response = await client.beta.messages.create({
-    model: model || 'claude-opus-5-5',
+    // Typed meals are simple; a faster model at low effort keeps them cheap.
+    model: imageBase64 ? model || 'claude-opus-5-5' : 'claude-sonnet-5-5',
     max_tokens: 16000,
     betas: ['server-side-fallback-2026-07-01'],
     fallbacks: 'default',
     system: SYSTEM_PROMPT,
-    output_config: { effort: 'medium', format: { type: 'json_schema', schema: MEAL_SCHEMA } },
+    output_config: { effort: imageBase64 ? 'medium' : 'low', format: { type: 'json_schema', schema: MEAL_SCHEMA } },
     messages: [{
       role: 'user',
-      content: [
+      content: imageBase64 ? [
         { type: 'image', source: { type: 'base64', media_type: mediaType, data: imageBase64 } },
         { type: 'text', text: note ? `Context from the user: ${note}` : 'Estimate this meal.' },
-      ],
+      ] : [{ type: 'text', text: `No photo. The user typed: ${String(note || '').slice(0, 500)}` }],
     }],
   })
-  if (response.stop_reason === 'refusal') throw new Error('The model declined to analyze this photo.')
+  if (response.stop_reason === 'refusal') throw new Error('The model declined to analyze this meal.')
   const text = response.content.filter((b) => b.type === 'text').map((b) => b.text).join('')
   return JSON.parse(text)
 })

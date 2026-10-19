@@ -6,7 +6,7 @@ import { CoachTips, useCoach } from '../components/Coach'
 import { useCelebrate } from '../components/Celebrate'
 import { Ring } from '../components/Ring'
 import { Bar, Button, Card, CountUp, Empty, IconButton, PageHeader, Sheet, Skeleton, rise, softSpring, spring, stagger, useToast } from '../components/ui'
-import { useQuery } from '../lib/db'
+import { getSetting, setSetting, useQuery } from '../lib/db'
 import { addDays, fmtDay, nowTime, today } from '../lib/dates'
 import { useDayTotals, useTargets } from '../lib/hooks'
 import { useNav, useSession } from '../lib/nav'
@@ -15,7 +15,7 @@ import { allFoods, dayTotals, deleteMeal, favoriteFoods, mealsOn, recentFoods, s
 import type { Food, Meal, MealItem } from '../lib/types'
 import type { Product } from '../lib/barcode'
 import { FOODS } from '../lib/foodDb'
-import { mealForTime, parseMeal } from '../lib/mealText'
+import { mealForTime, parseMeal, type Learned, type ParsedLine, type Suggestion } from '../lib/mealText'
 import { mealNote } from '../lib/coach'
 
 const BUILTIN_NAMES = new Set(FOODS.map((f) => f.name.toLowerCase()))
@@ -322,9 +322,45 @@ function QuickLog({ date, autoFocus, onReview }: { date: string; autoFocus?: boo
   }, [])
   // The user's own foods count, except copies of built-in foods (those store a logged portion, not a unit).
   const own = useMemo(() => (saved ?? []).filter((f) => !BUILTIN_NAMES.has(f.name.toLowerCase())), [saved])
-  const lines = useMemo(() => parseMeal(debounced, own), [debounced, own])
+  const learned = useQuery(() => getSetting<Learned>('food_aliases', {}), []) ?? {}
+  const lines = useMemo(() => parseMeal(debounced, own, learned), [debounced, own, learned])
   const found = lines.filter((l) => l.item).map((l) => l.item!)
   const missing = lines.filter((l) => !l.item)
+  const unsure = lines.filter((l) => !l.item || l.unsure)
+  const { profileId } = useSession()
+  const t = useTargets()
+  const toast = useToast()
+  const [hasKey, setHasKey] = useState(false)
+  useEffect(() => { platform.key.status(profileId).then((k) => setHasKey(k.set)).catch(() => {}) }, [profileId])
+  const [asking, setAsking] = useState<Set<string>>(new Set())
+  const learn = (l: ParsedLine, s: Suggestion) => { if (l.key) setSetting('food_aliases', { ...learned, [l.key]: s }) }
+  /** Ask AI for one typical serving of a dish, save it as the user's food and remember it for these words. */
+  const askAI = async (targets: ParsedLine[]) => {
+    const todo = targets.filter((l) => l.key && !asking.has(l.key))
+    if (!todo.length) return
+    setAsking((a) => new Set([...a, ...todo.map((l) => l.key!)]))
+    const next = { ...learned }
+    let failed = ''
+    await Promise.all(todo.map(async (l) => {
+      try {
+        const words = l.key!.trim()
+        const r = await platform.meal.analyze({ id: profileId, imageBase64: '', mediaType: '', model: t?.profile.model ?? '', note: `One typical serving of: ${l.text.replace(/^[\d\s./½¼¾]+/, '') || words}` })
+        const items = r.items.filter((i) => i.kcal > 0)
+        if (!items.length) { failed = `AI couldn't tell what "${l.text}" is.`; return }
+        const sum = (k: 'grams' | 'kcal' | 'protein_g' | 'carbs_g' | 'fat_g') => items.reduce((a, i) => a + i[k], 0)
+        const name = (items.length === 1 ? items[0].name : r.meal_name || l.text).replace(/\b\w/g, (c) => c.toUpperCase())
+        saveFood({ name, grams: Math.round(sum('grams')) || 100, kcal: Math.round(sum('kcal')), protein: +sum('protein_g').toFixed(1), carbs: +sum('carbs_g').toFixed(1), fat: +sum('fat_g').toFixed(1) })
+        next[l.key!] = { kind: 'saved', name }
+      } catch (e) {
+        const msg = String((e as Error).message || e)
+        failed = msg.includes('NO_KEY') ? 'Add your Claude API key in Settings to use AI.' : 'AI is not reachable right now. Check your internet and try again.'
+      }
+    }))
+    setSetting('food_aliases', next)
+    setAsking((a) => { const n = new Set(a); todo.forEach((l) => n.delete(l.key!)); return n })
+    if (failed) toast({ title: failed })
+  }
+  const busy = asking.size > 0
   const totals = { kcal: sum(found, 'kcal'), protein: sum(found, 'protein'), carbs: sum(found, 'carbs'), fat: sum(found, 'fat') }
   const note = mealNote(found)
   const allItems = () => lines.map((l) => l.item ?? { name: l.text, grams: 100, kcal: 0, protein: 0, carbs: 0, fat: 0, confidence: 'low' as const })
@@ -353,21 +389,28 @@ function QuickLog({ date, autoFocus, onReview }: { date: string; autoFocus?: boo
         {lines.length > 0 && (
           <motion.div key="lines" initial={{ opacity: 0, y: -6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -6 }} transition={softSpring}>
             <div className="col" style={{ gap: 2, marginTop: 12 }}>
-              {lines.map((l, i) => l.item ? (
-                <div key={i} className="quick-line">
-                  <div className="grow" style={{ minWidth: 0 }}>
-                    <div className="t-sm w-500">{l.item.name}</div>
-                    <div className="t-xs faint">{l.portion}{l.assumed && <span className="guess"> · amount guessed</span>}</div>
+              {lines.map((l, i) => (
+                <div key={i} className={`quick-line ${!l.item ? 'missing' : l.unsure ? 'unsure' : ''}`}>
+                  <div className="row" style={{ gap: 12, width: '100%' }}>
+                    <div className="grow" style={{ minWidth: 0 }}>
+                      {l.item ? <>
+                        <div className="t-sm w-500">{l.item.name}{l.unsure && <span className="t-xs guess"> · for "{l.text}"?</span>}</div>
+                        <div className="t-xs faint">{l.portion}{l.assumed && <span className="guess"> · amount guessed</span>}</div>
+                      </> : <>
+                        <div className="t-sm w-500">"{l.text}"</div>
+                        <div className="t-xs">{l.key && asking.has(l.key) ? 'Asking AI…' : 'Not in the food list yet.'}</div>
+                      </>}
+                    </div>
+                    {l.item && <div className="t-sm num"><span className="w-600">{l.item.kcal}</span> <span className="faint">kcal</span></div>}
                   </div>
-                  <div className="t-sm num"><span className="w-600">{l.item.kcal}</span> <span className="faint">kcal</span></div>
+                  {(!l.item || l.unsure) && !(l.key && asking.has(l.key)) && (
+                    <div className="row wrap" style={{ gap: 6, marginTop: 8 }}>
+                      {hasKey && <button className="chip-btn on" onClick={() => askAI([l])}><Sparkles size={12} /> Ask AI</button>}
+                      {(l.suggestions ?? []).map((s) => <button key={s.name} className="chip-btn" onClick={() => learn(l, s)}>{s.name}</button>)}
+                      <button className="chip-btn" onClick={() => onReview({ name: type, items: allItems() })}>Enter it myself</button>
+                    </div>
+                  )}
                 </div>
-              ) : (
-                <button key={i} className="quick-line missing" onClick={() => onReview({ name: type, items: allItems() })}>
-                  <div className="grow" style={{ minWidth: 0, textAlign: 'left' }}>
-                    <div className="t-sm w-500">"{l.text}"</div>
-                    <div className="t-xs">Not in the food list yet. Tap to enter its calories once, and it's remembered.</div>
-                  </div>
-                </button>
               ))}
             </div>
             {note && <div className="t-xs row" style={{ gap: 8, marginTop: 10, color: 'var(--text-2)', alignItems: 'flex-start' }}><Sparkles size={13} className="accent" style={{ flex: 'none', marginTop: 2 }} />{note}</div>}
@@ -380,7 +423,9 @@ function QuickLog({ date, autoFocus, onReview }: { date: string; autoFocus?: boo
               </div>
               <div className="row" style={{ gap: 8 }}>
                 <Button variant="ghost" onClick={() => onReview({ name: type, items: allItems() })}><Pencil size={14} /> Adjust</Button>
-                <Button variant="primary" onClick={log} disabled={text !== debounced}>{missing.length ? 'Review and log' : `Log ${type.toLowerCase()}`}</Button>
+                {hasKey && unsure.length > 0
+                  ? <Button variant="primary" onClick={() => askAI(unsure)} disabled={busy || text !== debounced}><Sparkles size={14} /> {busy ? 'Asking AI…' : `Fill in ${unsure.length} with AI`}</Button>
+                  : <Button variant="primary" onClick={log} disabled={text !== debounced}>{missing.length ? 'Review and log' : `Log ${type.toLowerCase()}`}</Button>}
               </div>
             </div>
           </motion.div>

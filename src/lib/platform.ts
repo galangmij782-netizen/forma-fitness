@@ -117,7 +117,7 @@ function browserPlatform(): Platform {
         guard(id)
         const key = await idb.get<string>(`key:${id}`)
         if (!key) {
-          if (isDemo()) return demoAnalysis()
+          if (isDemo()) return imageBase64 ? demoAnalysis() : demoText(note ?? '')
           throw new Error('NO_KEY')
         }
         const { analyzeWithClaude } = await import('./claude-browser')
@@ -161,6 +161,12 @@ async function demoAnalysis(): Promise<MealAnalysis> {
       { name: 'Olive oil (cooking)', grams: 8, kcal: 71, protein_g: 0, carbs_g: 0, fat_g: 8, confidence: 'low' },
     ],
   }
+}
+
+async function demoText(note: string): Promise<MealAnalysis> {
+  await new Promise((r) => setTimeout(r, 900))
+  const name = note.replace(/^.*?:\s*/, '').split(/[,\n]/)[0].trim() || 'Dish'
+  return { meal_name: name, notes: 'Demo estimate.', items: [{ name: name[0].toUpperCase() + name.slice(1), grams: 150, kcal: 225, protein_g: 10, carbs_g: 9, fat_g: 16, confidence: 'medium' }] }
 }
 
 export const platform: Platform = window.forma ?? browserPlatform()
