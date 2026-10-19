@@ -1,7 +1,7 @@
 // Realistic sample data so every screen can be explored before real logging starts.
-import { tx } from './db'
+import { all, get, run, tx } from './db'
 import { addDays, today } from './dates'
-import { createSplit, dayExercises, listDays, saveProfile, setScheduleDay } from './repo'
+import { createSplit, dayExercises, getProfile, listDays, saveProfile, setScheduleDay } from './repo'
 
 function rng(seed: number) {
   return () => { seed = (seed * 1664525 + 1013904223) % 4294967296; return seed / 4294967296 }
@@ -109,4 +109,33 @@ export function loadSampleData() {
   })
 
   saveProfile({ active_split_id: splitId, onboarded: true, sex: 'male', age: 28, height_cm: 178, activity: 'moderate', phase: 'lean_bulk' })
+}
+
+// Sample sessions are the only ones that start and end at the same moment.
+const SAMPLE_SESSIONS = "FROM sessions WHERE split_name = 'Push / Pull / Legs' AND started_at = ended_at"
+const SAMPLE_MEAL_NAMES = Object.values(FOODS).map((f) => f.name)
+
+export function hasSampleData() {
+  return !!get(`SELECT 1 ${SAMPLE_SESSIONS} LIMIT 1`)
+}
+
+/** Removes everything loadSampleData added, leaving anything the user logged. */
+export function removeSampleData() {
+  const loaded = get<{ d: string | null }>(`SELECT MAX(date) AS d ${SAMPLE_SESSIONS}`)?.d
+  const q = SAMPLE_MEAL_NAMES.map(() => '?').join(',')
+  tx((exec) => {
+    exec(`DELETE FROM sessions WHERE id IN (SELECT id ${SAMPLE_SESSIONS})`)
+    exec(`DELETE FROM meals WHERE source = 'manual' AND name IN (${q}) AND id IN (SELECT meal_id FROM meal_items GROUP BY meal_id HAVING COUNT(*) = 1 AND MAX(name) = meals.name)`, SAMPLE_MEAL_NAMES)
+    exec(`DELETE FROM foods WHERE name IN (${q})`, SAMPLE_MEAL_NAMES)
+    if (loaded) exec('DELETE FROM bodyweight WHERE date BETWEEN ? AND ?', [addDays(loaded, -60), addDays(loaded, 1)])
+  })
+  // The two template splits it created, unless the user has trained with them since.
+  const splits = all<{ id: number; name: string }>('SELECT id, name FROM splits ORDER BY position')
+  const unused = splits.filter((s) => (s.name === 'Push / Pull / Legs' || s.name === 'Upper / Lower')
+    && !get('SELECT 1 FROM sessions WHERE day_id IN (SELECT id FROM split_days WHERE split_id = ?) LIMIT 1', [s.id]))
+  const keep = splits.filter((s) => !unused.includes(s))
+  if (keep.length) {
+    unused.forEach((s) => run('DELETE FROM splits WHERE id = ?', [s.id]))
+    if (!keep.some((s) => s.id === getProfile().active_split_id)) saveProfile({ active_split_id: keep[0].id })
+  }
 }

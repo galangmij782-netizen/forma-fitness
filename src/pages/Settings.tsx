@@ -2,7 +2,7 @@ import { motion } from 'motion/react'
 import { Check, Download, FolderOpen, KeyRound, Lock, ShieldCheck, Sparkles, Trash2, Upload } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { Button, Card, PageHeader, Segmented, Stepper, rise, spring, stagger, useToast } from '../components/ui'
-import { exportJson, importJson, wipeAll } from '../lib/db'
+import { exportJson, importJson, useQuery, wipeAll } from '../lib/db'
 import { today } from '../lib/dates'
 import { useTargets } from '../lib/hooks'
 import { useSession } from '../lib/nav'
@@ -10,7 +10,7 @@ import { ACTIVITY, PHASES, computeTargets } from '../lib/nutrition'
 import { platform, type KeyStatus } from '../lib/platform'
 import { saveProfile } from '../lib/repo'
 import { ALARM_SOUNDS, getAlarmSound, playAlarm, setAlarmSound, stopAlarm, unlockAudio, type AlarmSound } from '../lib/alarm'
-import { loadSampleData } from '../lib/sample'
+import { hasSampleData, loadSampleData, removeSampleData } from '../lib/sample'
 import type { Activity, Phase } from '../lib/types'
 
 const swatch: Record<string, string> = { green: '#5fd99a', blue: '#6aa8ff', violet: '#a99bff' }
@@ -209,6 +209,7 @@ function DataCard() {
   const toast = useToast()
   const [info, setInfo] = useState<{ dataPath: string } | null>(null)
   const [confirm, setConfirm] = useState<null | 'wipe' | 'import'>(null)
+  const sample = useQuery(() => hasSampleData(), [])
   useEffect(() => { platform.app.info().then(setInfo) }, [])
   const doImport = async () => {
     const json = await platform.backup.import()
@@ -223,7 +224,9 @@ function DataCard() {
         {confirm === 'import'
           ? <Button onClick={doImport}><Upload size={15} /> Choose file (replaces current data)</Button>
           : <Button onClick={() => setConfirm('import')}><Upload size={15} /> Import backup</Button>}
-        <Button variant="ghost" onClick={() => { loadSampleData(); toast({ title: 'Sample data added' }) }}><Sparkles size={15} /> Add sample data</Button>
+        {sample
+          ? <Button onClick={() => { removeSampleData(); toast({ title: 'Sample data removed' }) }}><Trash2 size={15} /> Remove sample data</Button>
+          : <Button variant="ghost" onClick={() => { loadSampleData(); toast({ title: 'Sample data added' }) }}><Sparkles size={15} /> Add sample data</Button>}
         {confirm === 'wipe'
           ? <Button variant="danger" onClick={() => { wipeAll(); setConfirm(null); toast({ title: 'All training and meal data cleared' }) }}>Yes, clear everything</Button>
           : <Button variant="danger" onClick={() => setConfirm('wipe')}><Trash2 size={15} /> Clear data</Button>}

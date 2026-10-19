@@ -14,6 +14,8 @@ import { activeSession, allSets, dayExercises, getSplit, mealsOn, nextDay, sched
 import { analyzeTraining } from '../lib/training'
 import { weeklyRate } from '../lib/trend'
 import { useUnits } from '../lib/units'
+import { hasSampleData, removeSampleData } from '../lib/sample'
+import { useState } from 'react'
 
 export function Dashboard() {
   const { go } = useNav()
@@ -58,6 +60,8 @@ export function Dashboard() {
             <Play size={15} /> {workout?.live ? 'Continue workout' : 'Start workout'}
           </Button>
         </>} />
+
+      <SampleBanner />
 
       <div className="grid stack-md" style={{ gridTemplateColumns: '1.55fr 1fr', marginBottom: 16 }}>
         <Card style={{ padding: 32 }}>
@@ -209,6 +213,24 @@ export function InsightRow({ i }: { i: Insight }) {
       </div>
       <div className="t-xs muted" style={{ marginBottom: 6 }}>{i.detail}</div>
       <div className="t-sm row" style={{ gap: 8, alignItems: 'flex-start' }}><TrendingUp size={14} className="accent" style={{ marginTop: 3, flex: 'none' }} /> {i.suggestion}</div>
+    </motion.div>
+  )
+}
+
+/** Shown while demo workouts and meals are in the profile, so they're never mistaken for real logs. */
+function SampleBanner() {
+  const has = useQuery(() => hasSampleData(), [])
+  const [sure, setSure] = useState(false)
+  if (!has) return null
+  return (
+    <motion.div variants={rise} className="card pad-sm row wrap between" style={{ gap: 12, marginBottom: 16, borderColor: 'var(--warn)' }}>
+      <div style={{ minWidth: 200, flex: 1 }}>
+        <div className="w-600">You're looking at sample data</div>
+        <div className="t-sm muted">{sure ? 'This removes the demo workouts, meals and weights. Anything you logged yourself stays.' : 'The workouts, meals and weights here are made up so you can explore.'}</div>
+      </div>
+      {sure
+        ? <div className="row" style={{ gap: 8 }}><Button variant="ghost" onClick={() => setSure(false)}>Cancel</Button><Button variant="danger" onClick={() => { removeSampleData(); setSure(false) }}>Yes, remove it</Button></div>
+        : <Button onClick={() => setSure(true)}>Remove sample data</Button>}
     </motion.div>
   )
 }

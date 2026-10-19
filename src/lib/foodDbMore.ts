@@ -19,6 +19,7 @@ export const MORE_ROWS: Row[] = [
   ['Adobong puti', 'adobo puti, white adobo, adobong puti baboy', 280, 18, 2, 22, { cup: 200, serving: 150 }],
 
   // paksiw, stews and offal
+  ['Paksiw', 'paksiw, paksiw na baboy, pork paksiw', 220, 16, 6, 14, { cup: 220, serving: 180 }],
   ['Paksiw na isda', 'paksiw isda, fish paksiw, paksiw na bangus, paksiw bangus', 140, 18, 3, 6, { piece: 150, cup: 200, serving: 150 }],
   ['Paksiw na lechon', 'lechon paksiw, paksiw lechon', 290, 15, 10, 21, { cup: 220, serving: 150 }],
   ['Paksiw na pata', 'pata paksiw, pork hock paksiw', 260, 17, 12, 16, { cup: 220, serving: 200 }],
@@ -87,7 +88,8 @@ export const MORE_ROWS: Row[] = [
   ['Misua soup', 'misua with patola, misua at patola, ginisang misua, sopas misua', 55, 3, 7, 1.7, { cup: 240, bowl: 400, serving: 400 }],
   ['Sardinas with misua', 'sardines with misua, ginisang sardinas, sardinas at misua', 80, 5, 7, 3.5, { cup: 240, bowl: 350, serving: 300 }],
   ['Corn soup', 'sopas mais, corn egg drop soup, crab and corn soup', 70, 3, 10, 2, { cup: 240, bowl: 350, serving: 350 }],
-  ['Chicken arroz caldo', 'arroz caldo with chicken, arroz caldo manok, lugaw with chicken, aroskaldo', 85, 5, 11, 2.3, { cup: 240, bowl: 400, serving: 400 }],
+  ['Pancit canton', 'pancit canton guisado, canton guisado, cooked pancit canton, canton', 180, 7, 24, 6, { cup: 150, serving: 220, plate: 300 }],
+  ['Chicken arroz caldo', 'arroz caldo, arroz caldo with chicken, arroz caldo manok, lugaw with chicken, aroskaldo', 85, 5, 11, 2.3, { cup: 240, bowl: 400, serving: 400 }],
   ['Goto with tripe', 'goto tripe, tripe congee, goto batangas', 85, 5, 10, 2.8, { cup: 240, bowl: 400, serving: 400 }],
   ['Lugaw with egg', 'lugaw itlog, egg congee, lugaw na may itlog', 70, 3, 11, 1.5, { cup: 240, bowl: 400, serving: 400 }],
 
@@ -126,6 +128,7 @@ export const MORE_ROWS: Row[] = [
   ['Dried pusit', 'dried squid, pusit na tuyo, fried dried squid', 330, 60, 6, 7, { piece: 30, serving: 40 }],
   ['Danggit', 'dried danggit, fried danggit, dried rabbitfish', 340, 60, 0, 11, { piece: 10, serving: 40 }],
   ['Fried galunggong', 'galunggong, pritong galunggong, round scad, fried round scad', 240, 25, 0, 15.5, { piece: 80, serving: 160 }],
+  ['Inihaw na isda', 'grilled fish, inihaw isda, isdang inihaw', 150, 23, 1, 6, { piece: 200, serving: 200 }],
   ['Inihaw na tilapia', 'grilled tilapia, tilapia inihaw, inihaw tilapia', 140, 24, 1, 4.5, { piece: 200, serving: 200 }],
   ['Rellenong bangus', 'bangus relleno, stuffed milkfish, relleno bangus', 210, 15, 8, 13, { slice: 100, serving: 150 }],
   ['Bangus belly (fried)', 'fried bangus belly, bangus belly, boneless bangus belly', 290, 18, 1, 24, { piece: 150, serving: 150 }],
