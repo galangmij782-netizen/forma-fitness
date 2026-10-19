@@ -2,6 +2,8 @@
 // Filipino dishes are typical home recipes). `u` maps a unit or size to grams per one.
 // Everything here is an estimate: the meal editor lets the user correct any line.
 
+import { MORE_ROWS } from './foodDbMore'
+
 export interface BuiltinFood {
   name: string
   aliases: string[]
@@ -192,7 +194,7 @@ const ROWS: Row[] = [
   ['Peanuts', 'mani, peanut, roasted peanuts', 567, 26, 16, 49, { handful: 28, cup: 146, tbsp: 9, serving: 28 }],
 ]
 
-export const FOODS: BuiltinFood[] = ROWS.map(([name, aliases, kcal, protein, carbs, fat, u, d]) => ({
+export const FOODS: BuiltinFood[] = [...ROWS, ...MORE_ROWS].map(([name, aliases, kcal, protein, carbs, fat, u, d]) => ({
   name, kcal, protein, carbs, fat, u, d,
   aliases: [name.toLowerCase().replace(/[()]/g, ''), ...aliases.split(',').map((a) => a.trim()).filter(Boolean)],
 }))
