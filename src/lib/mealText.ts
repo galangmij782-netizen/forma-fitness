@@ -43,6 +43,7 @@ const UNIT_WORDS: Record<string, UnitKey | 'g' | 'kg' | 'oz' | 'lb' | 'ml' | 'l'
   can: 'can', cans: 'can', lata: 'can', bottle: 'bottle', bottles: 'bottle', bote: 'bottle',
   pack: 'pack', packs: 'pack', packet: 'pack', packets: 'pack', sachet: 'pack', sachets: 'pack', bag: 'pack', bags: 'pack',
   handful: 'handful', handfuls: 'handful',
+  tablet: 'piece', tablets: 'piece', tab: 'piece', tabs: 'piece', capsule: 'piece', capsules: 'piece', softgel: 'piece', softgels: 'piece', pill: 'piece', pills: 'piece',
 }
 const SIZE_WORDS: Record<string, UnitKey> = { small: 'small', maliit: 'small', medium: 'medium', regular: 'medium', large: 'large', big: 'large', malaki: 'large', jumbo: 'xl', xl: 'xl' }
 const VOLUME_ML: Partial<Record<UnitKey, number>> = { cup: 240, mug: 300, glass: 250, tbsp: 15, tsp: 5, bowl: 350 }

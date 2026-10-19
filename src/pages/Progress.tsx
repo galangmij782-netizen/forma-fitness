@@ -9,7 +9,7 @@ import { useTargets } from '../lib/hooks'
 import { useNav } from '../lib/nav'
 import { PHASES } from '../lib/nutrition'
 import { allSets, deleteWeight, exerciseHistory, listWeights, logWeight, splitMuscles, trainedExercises } from '../lib/repo'
-import { analyzeTraining, personalRecords, sessionStats, type Flag } from '../lib/training'
+import { analyzeTraining, personalRecords, sessionStats, weekOf, weeklyBests, type Flag, type WeekBest } from '../lib/training'
 import { weeklyRate } from '../lib/trend'
 import { useUnits } from '../lib/units'
 
@@ -56,8 +56,11 @@ function Lifts() {
   const series = stats.map((s) => ({ x: s.date, y: u.toDisplay(metric === 'top' ? s.top.weight : metric === 'e1rm' ? s.e1rm : s.volume) }))
   const first = series[0]?.y ?? 0, lastV = series[series.length - 1]?.y ?? 0
   const change = first ? ((lastV - first) / first) * 100 : 0
+  const weeks = weeklyBests(sets ?? [])
 
   return (
+    <>
+    <ThisWeek onPick={setExId} />
     <div className="grid stack-md" style={{ gridTemplateColumns: '280px 1fr', alignItems: 'start' }}>
       <motion.div className="col card flat lift-list" style={{ gap: 2, padding: 8, maxHeight: 'calc(100vh - 200px)', overflow: 'auto' }} variants={stagger} initial="hidden" animate="show">
         {exercises.map((e) => (
@@ -93,6 +96,23 @@ function Lifts() {
           </div>
           <LineChart data={series} height={260} format={(v) => (metric === 'volume' ? `${(v / 1000).toFixed(1)}k` : v.toFixed(0))} />
         </Card>
+        {weeks.length > 0 && (
+          <Card key={`weeks-${exId}`}>
+            <div className="card-title" style={{ marginBottom: 12 }}>Best set each week</div>
+            <table className="clean">
+              <thead><tr><th>Week of</th><th>Max weight</th><th style={{ textAlign: 'right' }}>Change</th></tr></thead>
+              <tbody>
+                {[...weeks].reverse().slice(0, 8).map((w, i, arr) => (
+                  <tr key={w.week}>
+                    <td className="muted">{fmtDay(w.week, { month: 'short', day: 'numeric' })}{w.week === weekOf(today()) ? ' · this week' : ''}</td>
+                    <td className="num">{+u.toDisplay(w.weight).toFixed(1)} {u.unit} × {w.reps}</td>
+                    <td className="num" style={{ textAlign: 'right' }}><Delta now={w} prev={arr[i + 1]} /></td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </Card>
+        )}
         <Card>
           <div className="card-title" style={{ marginBottom: 12 }}>Recent sessions</div>
           <table className="clean">
@@ -112,6 +132,52 @@ function Lifts() {
         </Card>
       </div>
     </div>
+    </>
+  )
+}
+
+/** Change in a week's best set against the week before it. */
+function Delta({ now, prev }: { now: WeekBest; prev?: WeekBest }) {
+  const u = useUnits()
+  if (!prev) return <span className="t-xs faint">first week</span>
+  const d = now.weight - prev.weight
+  if (d === 0) return <span className="t-xs muted">{now.reps > prev.reps ? `same, +${now.reps - prev.reps} reps` : now.reps < prev.reps ? `same, −${prev.reps - now.reps} reps` : 'same'}</span>
+  return <span className="t-xs w-600" style={{ color: d > 0 ? 'var(--accent)' : 'var(--danger)' }}>{d > 0 ? '+' : '−'}{+u.toDisplay(Math.abs(d)).toFixed(1)} {u.unit}</span>
+}
+
+/** Each lift's heaviest set this week next to its previous best week. */
+function ThisWeek({ onPick }: { onPick: (id: number) => void }) {
+  const u = useUnits()
+  // Early in the week before any workout, show last week instead of an empty card.
+  const data = useQuery(() => {
+    const bests = trainedExercises().map((e) => ({ e, b: weeklyBests(exerciseHistory(e.id)) }))
+    const rowsFor = (wk: string) => bests.map(({ e, b }) => {
+      const i = b.findIndex((w) => w.week === wk)
+      return i < 0 ? null : { id: e.id, name: e.name, now: b[i], prev: b[i - 1] as WeekBest | undefined }
+    }).filter((r): r is NonNullable<typeof r> => !!r)
+    const now = rowsFor(weekOf(today()))
+    return now.length ? { rows: now, last: false } : { rows: rowsFor(weekOf(addDays(today(), -7))), last: true }
+  }, [])
+  if (!data) return null
+  const { rows, last } = data
+  return (
+    <Card style={{ marginBottom: 16 }}>
+      <div className="row between" style={{ marginBottom: rows.length ? 10 : 4 }}>
+        <div className="card-title">{last ? "Last week's best lifts" : "This week's best lifts"}</div>
+        <span className="t-xs faint">vs the week before</span>
+      </div>
+      {rows.length === 0 ? <div className="t-sm muted">Finish a workout this week and your heaviest set for each exercise shows up here.</div> : (
+        <div className="col" style={{ gap: 2 }}>
+          {rows.map((r) => (
+            <button key={r.id} className="list-row hover" style={{ padding: '9px 10px', textAlign: 'left' }} onClick={() => onPick(r.id)}>
+              <span className="grow t-sm w-500">{r.name}</span>
+              <span className="t-sm num w-600">{+u.toDisplay(r.now.weight).toFixed(1)} {u.unit} <span className="faint w-400">× {r.now.reps}</span></span>
+              <span style={{ width: 92, textAlign: 'right' }}><Delta now={r.now} prev={r.prev} /></span>
+            </button>
+          ))}
+        </div>
+      )}
+    </Card>
   )
 }
 

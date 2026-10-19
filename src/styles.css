@@ -402,3 +402,8 @@ table.clean td { padding: 8px; border-top: 1px solid var(--hairline); }
 @media (prefers-reduced-motion: reduce) { .computing-orb { animation: none; } }
 .portion { padding: 16px; display: flex; flex-direction: column; }
 .portion-total { margin: 16px 0 14px; padding: 12px 14px; border-radius: 12px; background: color-mix(in oklab, var(--track) 55%, transparent); }
+.supp-row { display: flex; align-items: center; gap: 12px; width: 100%; padding: 9px 10px; border-radius: 12px; transition: background 0.2s; }
+button.supp-row:hover { background: color-mix(in oklab, var(--track) 50%, transparent); }
+.supp-check { width: 22px; height: 22px; flex: none; border-radius: 50%; border: 1.5px solid var(--text-3); display: grid; place-items: center; color: var(--bg); transition: background 0.2s, border-color 0.2s; }
+.supp-row.on .supp-check { background: var(--accent); border-color: var(--accent); }
+.supp-row.on .t-sm { color: var(--text-2); }

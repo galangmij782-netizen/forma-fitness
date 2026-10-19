@@ -15,6 +15,7 @@ import { analyzeTraining } from '../lib/training'
 import { weeklyRate } from '../lib/trend'
 import { useUnits } from '../lib/units'
 import { hasSampleData, removeSampleData } from '../lib/sample'
+import { SupplementCard } from '../components/SupplementCard'
 import { useState } from 'react'
 
 export function Dashboard() {
@@ -127,6 +128,8 @@ export function Dashboard() {
           )}
         </Card>
       </div>
+
+      <SupplementCard />
 
       {coach && <CoachTips tips={coach} limit={2} footer={coach.length > 2 && <button className="row accent t-sm w-500" style={{ gap: 6, marginTop: 16 }} onClick={() => go('meals')}>{coach.length - 2} more tips in Meals <ArrowRight size={14} /></button>} />}
 

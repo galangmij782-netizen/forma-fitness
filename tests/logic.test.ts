@@ -75,3 +75,17 @@ describe('weekly insights', () => {
     expect(ins[2].suggestion).toMatch(/Add about/)
   })
 })
+
+import { weekOf, weeklyBests } from '../src/lib/training'
+describe('weekly bests', () => {
+  it('groups by Monday weeks and keeps the heaviest set', () => {
+    expect(weekOf('2026-10-19')).toBe('2026-10-19')
+    expect(weekOf('2026-10-25')).toBe('2026-10-19')
+    expect(weekOf('2026-10-18')).toBe('2026-10-12')
+    const b = weeklyBests([
+      { date: '2026-10-13', weight: 57.5, reps: 8 }, { date: '2026-10-15', weight: 57.5, reps: 10 },
+      { date: '2026-10-20', weight: 60, reps: 6 }, { date: '2026-10-22', weight: 55, reps: 12 },
+    ])
+    expect(b).toEqual([{ week: '2026-10-12', weight: 57.5, reps: 10, date: '2026-10-15' }, { week: '2026-10-19', weight: 60, reps: 6, date: '2026-10-20' }])
+  })
+})

@@ -514,4 +514,17 @@ export const MORE_ROWS: Row[] = [
   ['Tuna flakes hot and spicy', 'spicy tuna flakes, century tuna hot spicy, tuna hot spicy, hot spicy tuna', 220, 18, 3, 15, { can: 155, serving: 75, tbsp: 15 }],
   ['Tuna afritada', 'century tuna afritada, tuna caldereta, tuna menudo, canned tuna afritada', 160, 12, 5, 10, { can: 155, serving: 75 }],
   ['Corned tuna', 'century corned tuna, canned corned tuna', 180, 17, 3, 11, { can: 155, serving: 75 }],
+
+  // supplements (label values; vitamins and creatine have no calories)
+  ['Multivitamin', 'centrum, centrum advance, centrum men, multivitamins, multi vitamin, vitamins, enervon, stresstabs, revicon, myra e', 0, 0, 0, 0, { piece: 1.5, serving: 1.5 }],
+  ['Creatine', 'creatine monohydrate, creatine powder, creapure', 0, 0, 0, 0, { scoop: 5, tsp: 5, serving: 5 }],
+  ['Fish oil', 'omega 3, omega-3, fish oil capsule, fish oil softgel', 900, 0, 0, 100, { piece: 1, serving: 1 }],
+  ['Vitamin C', 'ascorbic acid, poten-cee, potencee, ceelin, fern c, fern-c, vit c', 0, 0, 0, 0, { piece: 1, serving: 1 }],
+  ['Vitamin D3', 'vitamin d, vit d, vit d3, cholecalciferol', 0, 0, 0, 0, { piece: 1, serving: 1 }],
+  ['Magnesium', 'magnesium glycinate, magnesium citrate, magnesium tablet', 0, 0, 0, 0, { piece: 1, serving: 1 }],
+  ['Zinc', 'zinc tablet, zinc gluconate', 0, 0, 0, 0, { piece: 1, serving: 1 }],
+  ['Pre-workout', 'preworkout, pre workout, c4 pre workout', 0, 0, 0, 0, { scoop: 6, serving: 6 }],
+  ['BCAA', 'bcaa powder, amino acids, eaa', 0, 0, 0, 0, { scoop: 7, serving: 7 }],
+  ['Whey isolate', 'isolate, whey protein isolate, iso whey', 370, 86, 3, 1, { scoop: 30, serving: 30 }],
+  ['Mass gainer powder', 'gainer powder, serious mass, mass gainer scoop', 375, 15, 75, 2, { scoop: 85, serving: 170 }],
 ]

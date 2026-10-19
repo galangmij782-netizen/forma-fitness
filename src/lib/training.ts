@@ -170,3 +170,26 @@ export function analyzeTraining(opts: {
 
   return flags.sort((a, b) => b.severity - a.severity)
 }
+
+// ---------- weekly bests ----------
+/** Monday of the week containing an ISO date. */
+export function weekOf(date: string) {
+  const [y, m, d] = date.split('-').map(Number)
+  const dt = new Date(y, m - 1, d)
+  dt.setDate(dt.getDate() - ((dt.getDay() + 6) % 7))
+  return `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, '0')}-${String(dt.getDate()).padStart(2, '0')}`
+}
+
+export interface WeekBest { week: string; weight: number; reps: number; date: string }
+
+/** Heaviest set per week (most reps breaks ties), oldest first. */
+export function weeklyBests(sets: { date: string; weight: number; reps: number }[]): WeekBest[] {
+  const by = new Map<string, WeekBest>()
+  for (const s of sets) {
+    if (s.reps <= 0) continue
+    const w = weekOf(s.date)
+    const cur = by.get(w)
+    if (!cur || s.weight > cur.weight || (s.weight === cur.weight && s.reps > cur.reps)) by.set(w, { week: w, weight: s.weight, reps: s.reps, date: s.date })
+  }
+  return [...by.values()].sort((a, b) => a.week.localeCompare(b.week))
+}
