@@ -25,7 +25,7 @@ export type Learned = Record<string, Suggestion>
 const NUM_WORDS: Record<string, number> = {
   a: 1, an: 1, one: 1, isa: 1, isang: 1, two: 2, dalawa: 2, dalawang: 2, three: 3, tatlo: 3, tatlong: 3, four: 4, apat: 4, apat_na: 4,
   five: 5, lima: 5, limang: 5, six: 6, seven: 7, eight: 8, nine: 9, ten: 10, eleven: 11, twelve: 12,
-  half: 0.5, kalahati: 0.5, quarter: 0.25, couple: 2, few: 3, dozen: 12,
+  half: 0.5, kalahati: 0.5, kalahating: 0.5, third: 1 / 3, quarter: 0.25, couple: 2, few: 3, dozen: 12,
 }
 const FRACTIONS: Record<string, number> = { '½': 0.5, '¼': 0.25, '¾': 0.75, '⅓': 1 / 3, '⅔': 2 / 3 }
 
@@ -51,9 +51,27 @@ const FILLER = new Set(['of', 'ng', 'na', 'some', 'my', 'the', 'about', 'around'
 const stem = (w: string) => w.length > 3 && w.endsWith('ies') ? `${w.slice(0, -3)}y` : w.length > 3 && w.endsWith('oes') ? w.slice(0, -2) : w.length > 3 && w.endsWith('s') && !w.endsWith('ss') ? w.slice(0, -1) : w
 const words = (s: string) => s.toLowerCase().replace(/[^a-z0-9ñ%\s-]/g, ' ').split(/[\s-]+/).filter(Boolean).map(stem)
 
+const PART: Record<string, number> = { half: 0.5, kalahati: 0.5, kalahating: 0.5, quarter: 0.25, third: 1 / 3 }
+const WHOLE = Object.keys(NUM_WORDS).filter((w) => NUM_WORDS[w] >= 1 && !w.includes('_') && w !== 'a' && w !== 'an').join('|')
+
+/** "1 and a half" -> "1.5", "isa't kalahati" -> "1.5", "half a cup" -> "0.5 cup", "1-1/2" -> "1 1/2", so "and" doesn't split the amount off its food. */
+export function normalizeAmounts(text: string): string {
+  const num = (w: string) => (/^\d/.test(w) ? parseFloat(w) : NUM_WORDS[w.toLowerCase()] ?? 1)
+  return text
+    .replace(/(\d)\s*(?:-|&|\+|\band\b|\bat\b)\s*(\d+\/\d+)/gi, '$1 $2')
+    .replace(new RegExp(`\\b(\\d+(?:\\.\\d+)?|${WHOLE})(?:\\s*'t|\\s+(?:and|at|n|&|\\+))?\\s+(?:a\\s+|an\\s+)?(half|kalahati|kalahating|quarter|third)\\b`, 'gi'),
+      (all, w: string, p: string) => {
+        // "2 half" is two halves only when nothing joins them; keep it as written then.
+        if (!/'t|and|at|\bn\b|&|\+/i.test(all) && !/^(isa|one)/i.test(w) && /^\d/.test(w)) return all
+        return ` ${+(num(w) + PART[p.toLowerCase()]).toFixed(2)} `
+      })
+    .replace(/\b(?:a\s+)?(half|quarter|third)\s+(?:a|an)\b/gi, (_, p: string) => ` ${+PART[p.toLowerCase()].toFixed(2)} `)
+    .replace(/\ba\s+(half|quarter|third)\b/gi, (_, p: string) => ` ${+PART[p.toLowerCase()].toFixed(2)} `)
+}
+
 /** Split a typed meal into one entry per food. */
 export function splitEntries(text: string): string[] {
-  return text
+  return normalizeAmounts(text)
     .replace(/\btable\s+spoons?\b/gi, 'tbsp').replace(/\btea\s+spoons?\b/gi, 'tsp')
     .split(/\n|,|;|\+|&|\band\b|\bwith\b|\bplus\b|\bat\b/i)
     .map((s) => s.trim()).filter((s) => /[a-zñ]/i.test(s))
@@ -173,6 +191,8 @@ function gramsFor(f: BuiltinFood, q: Quantity): { grams: number; label: string; 
     return { grams: n * g, label: lbl(u), assumed: true }
   }
   if (q.size && f.u[q.size]) return { grams: n * f.u[q.size]!, label: `${fmtQty(n)} ${q.size}`, assumed: !q.explicit }
+  // Rice and similar: a bare count means cups when a serving is one cup ("1 and a half rice").
+  if (f.u.cup && f.u.serving === f.u.cup && !f.u.piece) return { grams: n * f.u.cup, label: lbl('cup'), assumed: false }
   for (const k of ['piece', 'serving', 'slice', 'cup', 'pack', 'can', 'glass', 'scoop', 'tbsp'] as const) {
     if (f.u[k]) return { grams: n * f.u[k]!, label: k === 'piece' ? `${fmtQty(n)}` : lbl(k), assumed: !q.explicit || k !== 'piece' }
   }

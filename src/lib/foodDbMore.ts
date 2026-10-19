@@ -26,7 +26,7 @@ export const MORE_ROWS: Row[] = [
   ['Dinuguan', 'pork blood stew, dinuguang baboy, chocolate meat', 210, 14, 4, 15, { cup: 220, serving: 150 }],
   ['Laing', 'gabi leaves in coconut milk, ginataang laing, taro leaves in coconut milk', 170, 4, 9, 13.5, { cup: 200, serving: 150 }],
   ['Pinangat', 'pinangat na laing, bicol pinangat, pinangat gabi', 190, 5, 10, 14.5, { piece: 100, serving: 150 }],
-  ['Bistek tagalog', 'beef steak tagalog, bistek na baka, filipino beef steak', 200, 20, 5, 11, { cup: 200, serving: 150 }],
+  ['Bistek tagalog', 'bistek, beef steak tagalog, bistek na baka, filipino beef steak', 200, 20, 5, 11, { cup: 200, serving: 150 }],
   ['Pork steak', 'pork bistek, porksteak, pork steak with onions', 230, 18, 5, 15.5, { cup: 200, serving: 150 }],
   ['Bicol express', 'bicol express pork, sinilihan, pork sinilihan', 330, 12, 5, 29, { cup: 220, serving: 150 }],
   ['Gising-gising', 'gising gising, ginataang sigarilyas, winged bean in coconut milk', 150, 5, 7, 11.5, { cup: 200, serving: 150 }],
@@ -320,11 +320,11 @@ export const MORE_ROWS: Row[] = [
   ['Club sandwich', 'clubhouse sandwich, clubhouse', 250, 12, 22, 12.5, { piece: 250, serving: 250 }],
 
   // Philippine fast food: Jollibee
-  ['Jollibee Chickenjoy', 'jollibee fried chicken, chicken joy, jabee chickenjoy, jolibee chickenjoy, chickenjoy jollibee, chikenjoy', 250, 20, 9, 15, { piece: 150, small: 110, medium: 150, large: 170, serving: 150 }],
-  ['Jollibee Yumburger', 'yum burger, jollibee burger, jabee yumburger, jolibee yumburger, yumburjer', 255, 11, 31, 9.5, { piece: 100, serving: 100 }],
+  ['Jollibee Chickenjoy', 'chickenjoy, jollibee fried chicken, chicken joy, jabee chickenjoy, jolibee chickenjoy, chickenjoy jollibee, chikenjoy', 250, 20, 9, 15, { piece: 150, small: 110, medium: 150, large: 170, serving: 150 }],
+  ['Jollibee Yumburger', 'yumburger, yum burger, jollibee burger, jabee yumburger, jolibee yumburger, yumburjer', 255, 11, 31, 9.5, { piece: 100, serving: 100 }],
   ['Cheesy Yumburger', 'yumburger cheese, cheesy yum, jollibee cheeseburger, cheesy yum burger', 265, 12, 29, 11, { piece: 115, serving: 115 }],
   ['Champ burger', 'jollibee champ, amazing aloha, aloha champ, champ', 245, 13, 18, 13.5, { piece: 260, serving: 260 }],
-  ['Jolly Spaghetti (Jollibee)', 'jollibee spaghetti, jabee spaghetti, jolibee spaghetti, jolly spag', 160, 5.5, 23, 5, { serving: 230, plate: 230, cup: 230 }],
+  ['Jolly Spaghetti (Jollibee)', 'jolly spaghetti, jollibee spaghetti, jabee spaghetti, jolibee spaghetti, jolly spag', 160, 5.5, 23, 5, { serving: 230, plate: 230, cup: 230 }],
   ['Palabok Fiesta', 'jollibee palabok fiesta, jabee palabok, palabok fiesta jollibee', 155, 6.5, 21, 5, { serving: 260, plate: 260 }],
   ['Jollibee Tuna pie', 'tuna pie, jabee tuna pie', 280, 8, 30, 14, { piece: 90, serving: 90 }],
   ['Jollibee Chicken sandwich', 'chickenjoy sandwich, crispy chicken sandwich, jollibee chicken burger', 250, 12, 25, 11.5, { piece: 170, serving: 170 }],

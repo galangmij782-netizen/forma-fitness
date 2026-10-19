@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { lookupBarcode } from '../src/lib/barcode'
+import { lookupBarcode, readPieces } from '../src/lib/barcode'
 
 vi.stubGlobal('location', { search: '' })
 afterEach(() => vi.unstubAllGlobals())
@@ -17,5 +17,14 @@ describe('lookupBarcode', () => {
     vi.stubGlobal('location', { search: '' })
     reply({ status: 0 })
     expect(await lookupBarcode('123456789')).toBeNull()
+  })
+})
+
+describe('pieces from labels', () => {
+  it('reads counts and piece weights', () => {
+    expect(readPieces('8 pcs', '', 200)).toEqual({ pieces: 8, pieceGrams: 25 })
+    expect(readPieces('10 x 25 g', '')).toEqual({ pieces: 10, pieceGrams: 25 })
+    expect(readPieces('200 g', '4 pieces (100 g)', 200, 100)).toEqual({ pieces: 8, pieceGrams: 25 })
+    expect(readPieces('500 g', '30 g', 500, 30)).toEqual({ pieces: undefined, pieceGrams: undefined })
   })
 })

@@ -395,3 +395,10 @@ table.clean td { padding: 8px; border-top: 1px solid var(--hairline); }
 .log-row .stepper input { flex: 1; min-width: 0; width: auto; }
 .log-row .btn { flex: none; }
 @media (max-width: 1100px) { .log-card { grid-column: 1 / -1; } .log-row .stepper, .log-row .stepper button, .log-row .btn { height: 44px; } .log-row .stepper input { font-size: 18px; } }
+
+.computing { margin-top: 12px; padding: 14px; border-radius: 14px; background: color-mix(in oklab, var(--accent) 7%, var(--surface)); border: 1px solid color-mix(in oklab, var(--accent) 22%, transparent); }
+.computing-orb { width: 34px; height: 34px; flex: none; border-radius: 50%; display: grid; place-items: center; color: var(--accent); background: color-mix(in oklab, var(--accent) 16%, transparent); animation: orb 1.6s ease-in-out infinite; }
+@keyframes orb { 0%, 100% { box-shadow: 0 0 0 0 color-mix(in oklab, var(--accent) 35%, transparent); transform: scale(1); } 50% { box-shadow: 0 0 0 8px transparent; transform: scale(1.06); } }
+@media (prefers-reduced-motion: reduce) { .computing-orb { animation: none; } }
+.portion { padding: 16px; display: flex; flex-direction: column; }
+.portion-total { margin: 16px 0 14px; padding: 12px 14px; border-radius: 12px; background: color-mix(in oklab, var(--track) 55%, transparent); }

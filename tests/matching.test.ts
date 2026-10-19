@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { parseEntry } from '../src/lib/mealText'
+import { parseEntry, parseMeal } from '../src/lib/mealText'
 
 describe('food matching', () => {
   it('finds cooked Filipino dishes by name', () => {
@@ -20,5 +20,16 @@ describe('food matching', () => {
     const again = parseEntry('mystery ulam ni lola', [], { [l.key!]: { kind: 'builtin', name: 'Pinakbet' } })
     expect(again.item?.name).toBe('Pinakbet')
     expect(again.unsure).toBe(false)
+  })
+})
+
+describe('mixed amounts', () => {
+  const grams = (t: string) => parseMeal(t).map((l) => l.item?.grams)
+  it('reads "and a half" style amounts as one number', () => {
+    for (const t of ['1 and half rice', '1 and a half cup rice', 'one and a half cups of rice', "isa't kalahating kanin", '1 at kalahati kanin', '1 1/2 cup rice', '1-1/2 cups rice', '1 & 1/2 cup rice', '1.5 cups rice'])
+      expect(grams(t), t).toEqual([237])
+    expect(grams('half a cup of rice')).toEqual([79])
+    expect(grams('a half cup rice')).toEqual([79])
+    expect(grams('1 rice and 2 eggs')).toEqual([158, 100])
   })
 })

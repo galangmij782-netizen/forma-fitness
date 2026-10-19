@@ -2,6 +2,7 @@ import { AnimatePresence, motion } from 'motion/react'
 import { Camera, ScanBarcode, ChevronLeft, ChevronRight, Flame, ImagePlus, KeyRound, Pencil, Plus, Search, Sparkles, Star, Trash2, X } from 'lucide-react'
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { BarcodeScanner } from '../components/BarcodeScanner'
+import { PortionPicker } from '../components/PortionPicker'
 import { CoachTips, useCoach } from '../components/Coach'
 import { useCelebrate } from '../components/Celebrate'
 import { Ring } from '../components/Ring'
@@ -235,11 +236,14 @@ function ManualFlow({ date, onDone, scan }: { date: string; onDone: () => void; 
   const recent = useQuery(() => recentFoods(), [])
   const favs = useQuery(() => favoriteFoods(), [])
   const add = (f: Food) => setIncoming({ n: Date.now(), item: { name: f.name, grams: f.grams, base_grams: f.grams, kcal: f.kcal, protein: f.protein, carbs: f.carbs, fat: f.fat, food_id: f.id } })
-  const found = (p: Product) => {
+  const [scanned, setScanned] = useState<Product | null>(null)
+  const found = (p: Product) => { setScanned(p); setScanning(false) }
+  const addScanned = (item: MealItem) => {
+    const p = scanned!
     saveFood({ name: p.item.name, grams: p.item.grams, kcal: p.item.kcal, protein: p.item.protein, carbs: p.item.carbs, fat: p.item.fat })
-    setIncoming({ n: Date.now(), item: { ...p.item } })
-    setScanning(false)
-    toast({ icon: <ScanBarcode size={14} />, title: p.name, body: `Added ${Math.round(p.item.grams)} g · ${p.item.kcal} kcal. Adjust grams if needed.` })
+    setIncoming({ n: Date.now(), item })
+    setScanned(null)
+    toast({ icon: <ScanBarcode size={14} />, title: p.name, body: `Added ${item.grams} g · ${item.kcal} kcal` })
   }
   const list = foods ?? [...(favs ?? []), ...(recent ?? []).filter((r) => !favs?.some((f) => f.id === r.id))]
 
@@ -247,7 +251,8 @@ function ManualFlow({ date, onDone, scan }: { date: string; onDone: () => void; 
     <div className="grid stack-md" style={{ gridTemplateColumns: '300px 1fr', gap: 24, alignItems: 'start' }}>
       <div className="col" style={{ gap: 10 }}>
         <AnimatePresence initial={false}>
-          {scanning && (
+          {scanned && <PortionPicker key={scanned.code} product={scanned} onAdd={addScanned} onCancel={() => setScanned(null)} />}
+          {scanning && !scanned && (
             <motion.div key="scan" initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }} transition={softSpring}>
               <BarcodeScanner onFound={found} />
             </motion.div>
@@ -307,7 +312,9 @@ function QuickLog({ date, autoFocus, onReview }: { date: string; autoFocus?: boo
   const box = useRef<HTMLTextAreaElement>(null)
   const saved = useQuery(() => allFoods(), [])
   const saveMealNow = useMealSaver()
-  useEffect(() => { const id = setTimeout(() => setDebounced(text), 200); return () => clearTimeout(id) }, [text])
+  // Results appear after a short "Computing macros" step once typing pauses.
+  useEffect(() => { if (!text.trim()) { setDebounced(''); return } const id = setTimeout(() => setDebounced(text), 1300); return () => clearTimeout(id) }, [text])
+  const computing = !!text.trim() && text !== debounced
   useEffect(() => { if (autoFocus) box.current?.focus() }, [autoFocus])
   useLayoutEffect(() => {
     const el = box.current
@@ -385,12 +392,12 @@ function QuickLog({ date, autoFocus, onReview }: { date: string; autoFocus?: boo
       <textarea ref={box} className="input quick-text" rows={2} aria-label="What did you eat?" value={text} onChange={(e) => setText(e.target.value)}
         onKeyDown={(e) => { if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) { e.preventDefault(); log() } }}
         placeholder={'2 medium eggs scrambled, 1 tbsp butter, 1 mug coffee'} />
-      <AnimatePresence initial={false}>
-        {lines.length > 0 && (
-          <motion.div key="lines" initial={{ opacity: 0, y: -6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -6 }} transition={softSpring}>
-            <div className="col" style={{ gap: 2, marginTop: 12 }}>
+      <AnimatePresence initial={false} mode="wait">
+        {computing ? <Computing key="computing" n={splitCount(text)} /> : lines.length > 0 && (
+          <motion.div key={`lines-${debounced}`} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -6 }} transition={softSpring}>
+            <motion.div className="col" style={{ gap: 2, marginTop: 12 }} variants={stagger} initial="hidden" animate="show">
               {lines.map((l, i) => (
-                <div key={i} className={`quick-line ${!l.item ? 'missing' : l.unsure ? 'unsure' : ''}`}>
+                <motion.div variants={rise} key={i} className={`quick-line ${!l.item ? 'missing' : l.unsure ? 'unsure' : ''}`}>
                   <div className="row" style={{ gap: 12, width: '100%' }}>
                     <div className="grow" style={{ minWidth: 0 }}>
                       {l.item ? <>
@@ -410,9 +417,9 @@ function QuickLog({ date, autoFocus, onReview }: { date: string; autoFocus?: boo
                       <button className="chip-btn" onClick={() => onReview({ name: type, items: allItems() })}>Enter it myself</button>
                     </div>
                   )}
-                </div>
+                </motion.div>
               ))}
-            </div>
+            </motion.div>
             {note && <div className="t-xs row" style={{ gap: 8, marginTop: 10, color: 'var(--text-2)', alignItems: 'flex-start' }}><Sparkles size={13} className="accent" style={{ flex: 'none', marginTop: 2 }} />{note}</div>}
             <div className="row between wrap-md" style={{ gap: 12, marginTop: 14 }}>
               <div className="row num" style={{ gap: 16 }}>
@@ -431,8 +438,38 @@ function QuickLog({ date, autoFocus, onReview }: { date: string; autoFocus?: boo
           </motion.div>
         )}
       </AnimatePresence>
-      {!lines.length && <div className="t-xs faint" style={{ marginTop: 8 }}>Type each food with an amount, separated by commas or new lines. Calories fill in as you type.</div>}
+      {!lines.length && !computing && <div className="t-xs faint" style={{ marginTop: 8 }}>Type each food with an amount, separated by commas or new lines. Amounts like "1 and a half cups" work too.</div>}
     </Card>
+  )
+}
+
+const splitCount = (t: string) => Math.max(1, t.split(/\n|,|;|\+/).filter((x) => /[a-zñ]/i.test(x)).length)
+const STEPS = ['Reading your meal', 'Matching foods', 'Weighing portions', 'Adding up protein, carbs and fat']
+
+/** The "Computing macros" step shown between typing and results. */
+function Computing({ n }: { n: number }) {
+  const [step, setStep] = useState(0)
+  useEffect(() => { const id = setInterval(() => setStep((s) => Math.min(s + 1, STEPS.length - 1)), 420); return () => clearInterval(id) }, [])
+  return (
+    <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -6 }} transition={softSpring} className="computing" role="status" aria-live="polite">
+      <div className="row" style={{ gap: 12 }}>
+        <span className="computing-orb"><Sparkles size={15} /></span>
+        <div className="grow">
+          <div className="t-sm w-600">Computing macros…</div>
+          <AnimatePresence mode="wait" initial={false}>
+            <motion.div key={step} className="t-xs muted" initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -4 }} transition={{ duration: 0.18 }}>{STEPS[step]}</motion.div>
+          </AnimatePresence>
+        </div>
+      </div>
+      <div className="col" style={{ gap: 8, marginTop: 14 }}>
+        {Array.from({ length: Math.min(n, 4) }, (_, i) => (
+          <div key={i} className="row" style={{ gap: 12 }}>
+            <Skeleton h={12} w={`${70 - i * 12}%`} />
+            <Skeleton h={12} w={48} style={{ marginLeft: 'auto' }} />
+          </div>
+        ))}
+      </div>
+    </motion.div>
   )
 }
 
