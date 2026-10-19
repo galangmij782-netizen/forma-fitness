@@ -1,16 +1,16 @@
 import { AnimatePresence, motion } from 'motion/react'
-import { Check, ChevronDown, Clock, Dumbbell, Flag, Play, Plus, Square, Timer, Trash2, Trophy } from 'lucide-react'
+import { CalendarDays, Check, ChevronDown, Clock, Pencil, Dumbbell, Flag, Play, Plus, Square, Timer, Trash2, Trophy } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { useCelebrate } from '../components/Celebrate'
 import { TrainingCalendar } from '../components/TrainingCalendar'
 import { useRestTimer } from '../components/RestTimer'
 import { Button, Card, CountUp, Empty, PageHeader, rise, spring, stagger } from '../components/ui'
 import { all, useQuery } from '../lib/db'
-import { fmtDay } from '../lib/dates'
+import { fmtDay, today } from '../lib/dates'
 import { useNav } from '../lib/nav'
 import {
   activeSession, dayExercises, deleteSession, deleteSet, exerciseHistory, finishSession, getProfile, lastPerformance,
-  listDays, listSessions, listSplits, logSet, nextDay, scheduledFor, sessionSets, startSession,
+  listDays, listSessions, listSplits, logSet, nextDay, scheduledFor, sessionSets, startSession, editingSession, reopenSession,
 } from '../lib/repo'
 import { isNewPR } from '../lib/training'
 import type { DayExercise, SetRow } from '../lib/types'
@@ -119,7 +119,8 @@ function HistoryRow({ s, fmt }: { s: ReturnType<typeof listSessions>[number]; fm
                 <span className="faint num">{rows.map((r) => `${fmt(r.weight).replace(/ (kg|lb)$/, '')}×${r.reps}`).join('  ')}</span>
               </div>
             ))}
-            <div className="row" style={{ justifyContent: 'flex-end', marginTop: 8 }}>
+            <div className="row" style={{ justifyContent: 'flex-end', marginTop: 8, gap: 8 }}>
+              <Button size="sm" onClick={() => { if (!activeSession()) reopenSession(s.id) }}><Pencil size={13} /> Edit</Button>
               <Button size="sm" variant="danger" onClick={() => deleteSession(s.id)}><Trash2 size={13} /> Delete session</Button>
             </div>
           </motion.div>
@@ -146,7 +147,9 @@ function LiveSession({ sessionId }: { sessionId: number }) {
   const elapsed = useElapsed(data?.s.started_at ?? new Date().toISOString())
   const u = useUnits()
   const [running, setRunning] = useState<Running>(null)
-  useWakeLock(!!data)
+  // Logging a past day or fixing a saved workout: no timers, just enter the sets.
+  const past = !!data && (data.s.date < today() || editingSession() === data.s.id)
+  useWakeLock(!!data && !past)
   if (!data) return null
   const { s, ex, sets } = data
   const done = sets.length
@@ -155,24 +158,29 @@ function LiveSession({ sessionId }: { sessionId: number }) {
 
   return (
     <motion.div className="page-inner" variants={stagger} initial="hidden" animate="show">
-      <PageHeader title={s.day_name} sub={<span className="row" style={{ gap: 14 }}><span>{s.split_name}</span><span className="row" style={{ gap: 5 }}><Clock size={13} /> <span className="num">{elapsed}</span></span></span>}
-        actions={<>
+      <PageHeader title={s.day_name} sub={past
+          ? <span className="row" style={{ gap: 6 }}><CalendarDays size={13} /> {editingSession() === s.id ? 'Editing' : 'Logging'} {fmtDay(s.date, { weekday: 'long', month: 'long', day: 'numeric' })}</span>
+          : <span className="row" style={{ gap: 14 }}><span>{s.split_name}</span><span className="row" style={{ gap: 5 }}><Clock size={13} /> <span className="num">{elapsed}</span></span></span>}
+        actions={past
+          ? <Button variant="primary" onClick={() => finishSession(s.id)}><Check size={15} /> Save workout</Button>
+          : <>
           <Button variant="ghost" onClick={() => deleteSession(s.id)}>Discard</Button>
           <Button variant="primary" onClick={() => finishSession(s.id)}><Flag size={15} /> Finish workout</Button>
         </>} />
+      {past && <motion.p variants={rise} className="t-sm muted" style={{ marginTop: -8, marginBottom: 16 }}>Enter the weight and reps for each set and tap the check. Nothing is timed.</motion.p>}
       <motion.div variants={rise} className="grid g-3 keep-3" style={{ marginBottom: 20 }}>
         <div className="card flat pad-sm"><div className="label">Sets done</div><div className="t-lg w-600"><CountUp value={done} /> <span className="t-sm muted">/ {planned}</span></div></div>
         <div className="card flat pad-sm"><div className="label">Volume</div><div className="t-lg w-600"><CountUp value={Math.round(u.toDisplay(volume))} /> <span className="t-sm muted">{u.unit}</span></div></div>
         <div className="card flat pad-sm"><div className="label">Exercises</div><div className="t-lg w-600"><CountUp value={new Set(sets.map((x) => x.exercise_id)).size} /> <span className="t-sm muted">/ {ex.length}</span></div></div>
       </motion.div>
       <div className="col" style={{ gap: 14 }}>
-        {ex.map((e) => <ExerciseLog key={e.id} sessionId={s.id} e={e} logged={sets.filter((x) => x.exercise_id === e.exercise_id)} running={running} setRunning={setRunning} />)}
+        {ex.map((e) => <ExerciseLog key={e.id} sessionId={s.id} e={e} logged={sets.filter((x) => x.exercise_id === e.exercise_id)} running={running} setRunning={setRunning} past={past} />)}
       </div>
     </motion.div>
   )
 }
 
-function ExerciseLog({ sessionId, e, logged, running, setRunning }: { sessionId: number; e: DayExercise; logged: SetRow[]; running: Running; setRunning: (r: Running) => void }) {
+function ExerciseLog({ sessionId, e, logged, running, setRunning, past }: { sessionId: number; e: DayExercise; logged: SetRow[]; running: Running; setRunning: (r: Running) => void; past?: boolean }) {
   const u = useUnits()
   const timer = useRestTimer()
   const celebrate = useCelebrate()
@@ -208,7 +216,7 @@ function ExerciseLog({ sessionId, e, logged, running, setRunning }: { sessionId:
         value: +u.toDisplay(pr.value).toFixed(1), decimals: 1, unit: u.unit, caption: e.name,
       })
     }
-    timer.start(e.rest_sec, idx + 1 < e.sets ? `${e.name} · next: set ${idx + 2}` : `${e.name} · last set done`)
+    if (!past) timer.start(e.rest_sec, idx + 1 < e.sets ? `${e.name} · next: set ${idx + 2}` : `${e.name} · last set done`)
   }
 
   return (
@@ -238,7 +246,7 @@ function ExerciseLog({ sessionId, e, logged, running, setRunning }: { sessionId:
         ))}
       </div>
       <div className="row set-actions" style={{ marginTop: 10, gap: 8 }}>
-        {(!complete || mine) && (
+        {!past && (!complete || mine) && (
           <motion.button className={`btn ${mine ? 'set-running' : 'primary'} grow`} whileTap={{ scale: 0.97 }} transition={spring} onClick={mine ? finishSet : startSet}>
             {mine
               ? <><Square size={15} fill="currentColor" /> Finish set {mine.idx + 1} <span className="num" style={{ marginLeft: 'auto' }}>{clock(Math.floor((now - mine.startedAt) / 1000))}</span></>

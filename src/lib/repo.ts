@@ -150,11 +150,22 @@ export const listSessions = (limit = 30) => all<Session & { sets: number; volume
   FROM sessions s LEFT JOIN sets x ON x.session_id = s.id WHERE s.ended_at IS NOT NULL
   GROUP BY s.id ORDER BY s.date DESC, s.id DESC LIMIT ?`, [limit])
 
-export function startSession(dayId: number) {
+/** Starts a workout. A past date logs a workout the user forgot to record. */
+export function startSession(dayId: number, date = today()) {
   const d = get<SplitDay & { split_name: string }>('SELECT d.*, s.name AS split_name FROM split_days d JOIN splits s ON s.id = d.split_id WHERE d.id = ?', [dayId])!
-  return run('INSERT INTO sessions(day_id, day_name, split_name, date, started_at) VALUES(?, ?, ?, ?, ?)', [dayId, d.name, d.split_name, today(), new Date().toISOString()])
+  return run('INSERT INTO sessions(day_id, day_name, split_name, date, started_at) VALUES(?, ?, ?, ?, ?)', [dayId, d.name, d.split_name, date, new Date().toISOString()])
 }
+
+// A finished workout reopened to fix or add sets; it is saved, never discarded.
+const EDIT_KEY = 'forma:editing-session'
+export const editingSession = () => { try { return Number(localStorage.getItem(EDIT_KEY)) || 0 } catch { return 0 } }
+export function reopenSession(id: number) {
+  try { localStorage.setItem(EDIT_KEY, String(id)) } catch { /* storage blocked */ }
+  run('UPDATE sessions SET ended_at = NULL WHERE id = ?', [id])
+}
+export const sessionsOn = (date: string) => all<Session>('SELECT * FROM sessions WHERE date = ? AND ended_at IS NOT NULL ORDER BY id', [date])
 export const finishSession = (id: number) => {
+  try { if (editingSession() === id) localStorage.removeItem(EDIT_KEY) } catch { /* storage blocked */ }
   const count = get<{ n: number }>('SELECT COUNT(*) AS n FROM sets WHERE session_id = ?', [id])!.n
   if (count === 0) run('DELETE FROM sessions WHERE id = ?', [id])
   else run('UPDATE sessions SET ended_at = ? WHERE id = ?', [new Date().toISOString(), id])

@@ -1,9 +1,9 @@
 import { AnimatePresence, motion } from 'motion/react'
-import { CalendarDays, Check, ChevronLeft, ChevronRight, Moon, Play, X } from 'lucide-react'
+import { CalendarDays, Check, ChevronLeft, ChevronRight, Moon, Pencil, Play, Plus, X } from 'lucide-react'
 import { useState } from 'react'
 import { useQuery } from '../lib/db'
 import { fmtDay, iso, today } from '../lib/dates'
-import { WEEKDAYS, getSchedule, setMark, startSession, trainingCalendar, type CalDay } from '../lib/repo'
+import { WEEKDAYS, activeSession, getSchedule, listDays, reopenSession, sessionsOn, setMark, startSession, trainingCalendar, type CalDay } from '../lib/repo'
 import { Button, Card, Sheet, spring } from './ui'
 
 const LABEL: Record<CalDay['state'], string> = {
@@ -65,14 +65,18 @@ export function TrainingCalendar({ splitId, onPlan }: { splitId: number | null |
       </div>
 
       <Sheet open={!!current} onClose={() => setOpen(null)} title={current ? fmtDay(current.date, { weekday: 'long', month: 'long', day: 'numeric' }) : ''}>
-        {current && <DayDetail d={current} onClose={() => setOpen(null)} />}
+        {current && <DayDetail d={current} splitId={splitId} onClose={() => setOpen(null)} />}
       </Sheet>
     </Card>
   )
 }
 
-function DayDetail({ d, onClose }: { d: CalDay; onClose: () => void }) {
+function DayDetail({ d, splitId, onClose }: { d: CalDay; splitId: number | null | undefined; onClose: () => void }) {
   const [note, setNote] = useState(d.mark?.note ?? '')
+  const info = useQuery(() => ({ days: splitId ? listDays(splitId) : [], done: sessionsOn(d.date), busy: !!activeSession() }), [splitId, d.date])
+  const [pick, setPick] = useState<number | undefined>(d.plannedDayId)
+  const chosen = pick ?? info?.days[0]?.id
+  const isToday = d.date === today()
   const isPast = d.date <= today()
   const reasons = ['Busy', 'Sick', 'Tired', 'Sore', 'Travel']
   return (
@@ -84,12 +88,29 @@ function DayDetail({ d, onClose }: { d: CalDay; onClose: () => void }) {
         {d.state === 'missed' && <div className="t-sm" style={{ color: 'var(--danger)', marginTop: 6 }}>No workout was logged this day.</div>}
         {d.mark && <div className="t-sm muted" style={{ marginTop: 6 }}>Marked as {d.mark.status === 'rest' ? 'a rest day' : "didn't train"}{d.mark.note ? `: ${d.mark.note}` : ''}</div>}
       </div>
-      {d.date === today() && d.plannedDayId && !d.sessions.length && (
-        <Button variant="primary" size="lg" onClick={() => { startSession(d.plannedDayId!); onClose() }}><Play size={15} fill="currentColor" /> Start {d.planned}</Button>
+      {info && info.done.length > 0 && (
+        <div className="row wrap" style={{ gap: 8 }}>
+          {info.done.map((s) => <Button key={s.id} disabled={info.busy} onClick={() => { reopenSession(s.id); onClose() }}><Pencil size={14} /> Edit {s.day_name}</Button>)}
+        </div>
+      )}
+      {isPast && info && info.days.length > 0 && (
+        <>
+          {!d.sessions.length && !isToday && <div className="label">Forgot to log it? Add the workout you did</div>}
+          {d.sessions.length > 0 && <div className="label">Did another workout this day?</div>}
+          {(!d.sessions.length || !isToday) && <div className="row wrap" style={{ gap: 6 }}>
+            {info.days.map((x) => <button key={x.id} className={`chip-btn ${chosen === x.id ? 'on' : ''}`} onClick={() => setPick(x.id)}>{x.name}</button>)}
+          </div>}
+          {(!d.sessions.length || !isToday) && chosen && (
+            <Button variant={d.sessions.length ? undefined : 'primary'} size="lg" disabled={info.busy} onClick={() => { startSession(chosen, d.date); onClose() }}>
+              {isToday ? <><Play size={15} fill="currentColor" /> Start {info.days.find((x) => x.id === chosen)?.name}</> : <><Plus size={15} /> Log {info.days.find((x) => x.id === chosen)?.name} for this day</>}
+            </Button>
+          )}
+          {info.busy && <div className="t-xs muted">Finish the workout that's open first.</div>}
+        </>
       )}
       {isPast && !d.sessions.length && (
         <>
-          <div className="label">Didn't make it to the gym? Add a reason (optional)</div>
+          <div className="label" style={{ marginTop: 6 }}>Or, didn't make it to the gym? Add a reason (optional)</div>
           <div className="row wrap" style={{ gap: 6 }}>
             {reasons.map((r) => <button key={r} className={`chip-btn ${note === r ? 'on' : ''}`} onClick={() => setNote(note === r ? '' : r)}>{r}</button>)}
           </div>
