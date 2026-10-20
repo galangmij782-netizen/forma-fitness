@@ -56,6 +56,7 @@ function cleanName(raw: string) {
   const n = raw
     .replace(/\(.*?\)/g, ' ')
     .replace(/[@].*$/, ' ')
+    .replace(/\b(rpe|rir)\s*\d+(\.\d+)?/gi, ' ')
     .replace(/[:|,;–—]+/g, ' ')
     .replace(/\s-\s/g, ' ')
     .replace(/\b(sets?|reps?|x|each( side| arm| leg)?|per side)\b/gi, ' ')
@@ -84,6 +85,8 @@ function readSetsReps(line: string): { sets: number; min: number; max: number; t
     [new RegExp(String.raw`(\d+)\s*[x×*]\s*${range}`, 'i'), (m) => [+m[1], +m[2], +(m[3] ?? m[2])]],
     [new RegExp(String.raw`${range}\s*reps?\s*(?:x|×|for)?\s*(\d+)\s*sets?`, 'i'), (m) => [+m[3], +m[1], +(m[2] ?? m[1])]],
     [/(\d+)\s*(?:sets?)?\s*[x×*]?\s*(?:amrap|to failure|max)/i, (m) => [+m[1], 8, 12]],
+    // Copied from a spreadsheet or notes table: "Bench<tab>4<tab>8-10" or "Bench 4 8".
+    [new RegExp(String.raw`[\t ](\d{1,2})[\t ,]+${range}\s*$`), (m) => [+m[1], +m[2], +(m[3] ?? m[2])]],
   ]
   for (const [re, pick] of tries) {
     const m = line.match(re)
@@ -100,7 +103,10 @@ const dayKey = (name: string) => name.toLowerCase().replace(/[^a-z0-9]/g, '')
 
 export function parseProgram(text: string): Program {
   const overview: { weekdays: number[]; key: string }[] = []
-  const lines = text.split(/\r?\n/).map((l) => l.replace(/^\s*(?:[-*•▪◦]|\d+[.)])\s*/, '').trim()).filter(Boolean)
+  const lines = text.split(/\r?\n/).map((l) => l.replace(/^\s*(?:[-*•▪◦]|\d+[.)])\s*/, '').trim())
+    // Table headings copied from a spreadsheet ("Push day  Sets  Reps") keep only the day name.
+    .map((l) => (/\d/.test(l) ? l : l.replace(/(?:[\t ]+(?:sets?|reps?|rest|weight|kg|lbs?|notes?|exercises?))+\s*$/i, '').trim()))
+    .filter(Boolean)
   const days: ProgramDay[] = []
   let title: string | null = null
   let pendingHeaders: string[] = []
