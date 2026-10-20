@@ -145,7 +145,7 @@ function ProgramSheet({ open, onClose, onCreated }: { open: boolean; onClose: ()
           <div className="t-xs faint">One exercise per line with sets and reps, like <b>3x8-12</b> or <b>4 sets of 10</b>. Put a day name (Push, Day 1, Monday) on its own line before its exercises. Add <b>rest 90s</b> to set the rest, or I'll pick one.</div>
         </div>
         <div className="col" style={{ gap: 12 }}>
-          {!count && <div className="card flat pad-sm t-sm muted">Your split will appear here as you type.</div>}
+          {!count && <div className="card flat pad-sm t-sm muted">{text.trim() ? <>I couldn't find exercises yet. Put each exercise on its own line, like <b>Bench press 3x8</b>, with the day name (Push, Monday) on the line above.</> : 'Your split will appear here as you type.'}</div>}
           {days.map((d, i) => (
             <div key={i} className="card flat pad-sm" style={{ background: 'var(--surface)' }}>
               <div className="row between" style={{ marginBottom: 8 }}><span className="w-600">{d.name}{d.weekdays?.length ? <span className="t-xs accent" style={{ marginLeft: 8 }}>{d.weekdays.map((w) => WEEKDAYS[w]).join(', ')}</span> : null}</span><span className="t-xs faint">{d.exercises.length} exercise{d.exercises.length === 1 ? '' : 's'} · {d.exercises.reduce((a, e) => a + e.sets, 0)} sets</span></div>
@@ -154,7 +154,7 @@ function ProgramSheet({ open, onClose, onCreated }: { open: boolean; onClose: ()
                   <div key={j} className="row" style={{ gap: 8 }}>
                     <div className="grow" style={{ minWidth: 0 }}>
                       <div className="t-sm w-500">{e.name}</div>
-                      <div className="t-xs faint num">{e.sets} × {e.repsMin === e.repsMax ? e.repsMin : `${e.repsMin}–${e.repsMax}`} · rest {e.rest >= 60 ? `${Math.floor(e.rest / 60)}:${String(e.rest % 60).padStart(2, '0')}` : `${e.rest}s`}{!e.restGiven && ' (suggested)'}</div>
+                      <div className="t-xs faint num">{e.sets} × {e.repsMin === e.repsMax ? e.repsMin : `${e.repsMin}–${e.repsMax}`} · rest {e.rest >= 60 ? `${Math.floor(e.rest / 60)}:${String(e.rest % 60).padStart(2, '0')}` : `${e.rest}s`}{!e.restGiven && ' (suggested)'}{e.setsGuessed && <span style={{ color: 'var(--warn)' }}> · sets guessed</span>}</div>
                     </div>
                     <select className="input sm" style={{ width: 140 }} aria-label="Muscle" value={e.muscle} onChange={(ev) => setMuscles((m) => ({ ...m, [e.name]: ev.target.value as MuscleGroup }))}>
                       {MUSCLE_GROUPS.map((g) => <option key={g}>{g}</option>)}
@@ -173,7 +173,7 @@ function ProgramSheet({ open, onClose, onCreated }: { open: boolean; onClose: ()
                 </div>
               )}
               <label className="row t-sm" style={{ gap: 8 }}><input type="checkbox" checked={makeActive} onChange={(e) => setMakeActive(e.target.checked)} /> Make this my active split</label>
-              <Button variant="primary" size="lg" onClick={create}>{target && mode === 'replace' ? 'Save split' : 'Create split'} · {days.length} day{days.length > 1 ? 's' : ''}, {count} exercises</Button>
+              <Button variant="primary" size="lg" onClick={create} style={{ position: 'sticky', bottom: 12, zIndex: 2 }}>{target && mode === 'replace' ? 'Save split' : 'Create split'} · {days.length} day{days.length > 1 ? 's' : ''}, {count} exercises</Button>
             </>
           )}
         </div>

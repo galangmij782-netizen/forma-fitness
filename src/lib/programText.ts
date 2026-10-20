@@ -4,7 +4,7 @@
 //   Lateral raise 4 sets of 15, rest 60s
 import type { MuscleGroup } from './types'
 
-export interface ProgramExercise { name: string; muscle: MuscleGroup; sets: number; repsMin: number; repsMax: number; rest: number; restGiven: boolean; line: string }
+export interface ProgramExercise { name: string; muscle: MuscleGroup; sets: number; repsMin: number; repsMax: number; rest: number; restGiven: boolean; line: string; setsGuessed?: boolean }
 export interface ProgramDay { name: string; exercises: ProgramExercise[]; weekdays?: number[] }
 
 // Weekday 0 = Monday. English and Tagalog names and short forms.
@@ -99,6 +99,16 @@ function readSetsReps(line: string): { sets: number; min: number; max: number; t
   return null
 }
 
+// Lines with no sets written ("Bench press", "Lat pulldown 10-12") still count as exercises
+// when they name a movement; sets default to 3.
+const MOVE_RE = /\b(press|bench|curls?|rows?|squats?|deadlifts?|rdl|ohp|raises?|fl(?:y|ye|ies|yes)|pulldowns?|pull ?-?ups?|chin ?-?ups?|dips?|extensions?|lunges?|calf|calves|crunch(?:es)?|shrugs?|pushdowns?|push ?-?ups?|thrusts?|plank|kickbacks?|leg curl|hack|step ?-?ups?|face ?pulls?|pullovers?|good ?mornings?|hip ?thrusts?|abductions?|adductions?|sit ?-?ups?)\b/i
+function guessSetsReps(line: string): { sets: number; min: number; max: number; text: string } | null {
+  if (!MOVE_RE.test(line) || weekdaysIn(line).length || /^(day|araw|week)\b/i.test(line)) return null
+  const r = line.match(/(\d+)\s*(?:-|–|to)\s*(\d+)(?:\s*reps?)?/i) ?? line.match(/\b(\d{1,2})\s*reps?\b/i)
+  if (r) { const a = +r[1], b = +(r[2] ?? r[1]); if (a > 0 && a <= 50) return { sets: 3, min: Math.min(a, b), max: Math.max(a, b), text: r[0] } }
+  return { sets: 3, min: 8, max: 12, text: '' }
+}
+
 const dayKey = (name: string) => name.toLowerCase().replace(/[^a-z0-9]/g, '')
 
 export function parseProgram(text: string): Program {
@@ -111,7 +121,8 @@ export function parseProgram(text: string): Program {
   let title: string | null = null
   let pendingHeaders: string[] = []
   for (const line of lines) {
-    const sr = readSetsReps(line)
+    const written = readSetsReps(line)
+    const sr = written ?? guessSetsReps(line)
     if (!sr) {
       // "Rest: 2-3 min" on its own line belongs to the exercise above it.
       const lastDay = days[days.length - 1], lastEx = lastDay?.exercises[lastDay.exercises.length - 1]
@@ -138,13 +149,13 @@ export function parseProgram(text: string): Program {
       pendingHeaders = []
     }
     const rest = readRest(line)
-    let nameRaw = line.replace(sr.text, ' ')
+    let nameRaw = sr.text ? line.replace(sr.text, ' ') : line
     if (rest) nameRaw = nameRaw.replace(rest.text, ' ')
     nameRaw = nameRaw.replace(/\b(rest|pahinga)\b.*$/i, ' ')
     const name = cleanName(nameRaw) || 'Exercise'
     days[days.length - 1].exercises.push({
       name, muscle: guessMuscle(name), sets: sr.sets, repsMin: sr.min, repsMax: sr.max,
-      rest: rest?.secs ?? defaultRest(name, sr.max), restGiven: !!rest, line,
+      rest: rest?.secs ?? defaultRest(name, sr.max), restGiven: !!rest, line, setsGuessed: !written,
     })
   }
   // Programs written week by week repeat the same day ("Week 1 ... Lower A ... Week 2 ... Lower A").
