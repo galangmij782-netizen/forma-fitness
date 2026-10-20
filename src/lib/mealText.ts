@@ -72,7 +72,7 @@ export function normalizeAmounts(text: string): string {
 
 /** Split a typed meal into one entry per food. */
 export function splitEntries(text: string): string[] {
-  return normalizeAmounts(text)
+  return normalizeAmounts(text).replace(/\bsweet\s*(?:and|&|n)\s*(spicy|sour)\b/gi, 'sweet n $1')
     .replace(/\btable\s+spoons?\b/gi, 'tbsp').replace(/\btea\s+spoons?\b/gi, 'tsp')
     .split(/\n|,|;|\+|&|\band\b|\bwith\b|\bplus\b|\bat\b/i)
     .map((s) => s.trim()).filter((s) => /[a-zñ]/i.test(s))
@@ -85,6 +85,8 @@ export function readQuantity(entry: string): Quantity {
   let s = entry.toLowerCase().replace(/\b3\s*-?\s*in\s*-?\s*1\b/g, 'threeinone')
   for (const [k, v] of Object.entries(FRACTIONS)) s = s.replaceAll(k, ` ${v} `)
   s = s.replace(/(\d)([a-z])/g, '$1 $2')
+  // "555 tuna" / "555 sardines" is a brand, not a count.
+  s = s.replace(/\b555\s+(?=tuna|sardin|corned)/g, 'triplefive ')
   const tokens = s.split(/\s+/).filter(Boolean)
   let qty = 0, unit: string | null = null, size: UnitKey | null = null, explicit = false
   const rest: string[] = []
