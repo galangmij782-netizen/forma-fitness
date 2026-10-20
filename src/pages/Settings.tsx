@@ -1,15 +1,16 @@
 import { motion } from 'motion/react'
-import { Check, Download, FolderOpen, KeyRound, Lock, ShieldCheck, Sparkles, Trash2, Upload } from 'lucide-react'
+import { Bell, Check, Download, Plus, X, FolderOpen, KeyRound, Lock, ShieldCheck, Sparkles, Trash2, Upload } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { Button, Card, PageHeader, Segmented, Stepper, rise, spring, stagger, useToast } from '../components/ui'
-import { exportJson, importJson, useQuery, wipeAll } from '../lib/db'
+import { exportJson, importJson, setSetting, useQuery, wipeAll } from '../lib/db'
+import { DEFAULT_REMINDERS, getReminders, reminderMessage, type ReminderSettings } from '../lib/reminders'
 import { today } from '../lib/dates'
 import { useTargets } from '../lib/hooks'
 import { useSession } from '../lib/nav'
 import { ACTIVITY, PHASES, computeTargets } from '../lib/nutrition'
 import { platform, type KeyStatus } from '../lib/platform'
 import { saveProfile } from '../lib/repo'
-import { ALARM_SOUNDS, getAlarmSound, playAlarm, setAlarmSound, stopAlarm, unlockAudio, type AlarmSound } from '../lib/alarm'
+import { ALARM_SOUNDS, getAlarmSound, notifyNow, playAlarm, setAlarmSound, stopAlarm, unlockAudio, type AlarmSound } from '../lib/alarm'
 import { hasSampleData, loadSampleData, removeSampleData } from '../lib/sample'
 import type { Activity, Phase } from '../lib/types'
 
@@ -29,6 +30,7 @@ export function Settings() {
         <GoalCard />
         <AppearanceCard />
         <AlarmCard />
+        <ReminderCard />
         <PhotoCard />
         <ProfileCard />
         <DataCard />
@@ -138,6 +140,50 @@ function AlarmCard() {
     </Section>
   )
 }
+
+function ReminderCard() {
+  const r = useQuery(() => getReminders(), []) ?? DEFAULT_REMINDERS
+  const toast = useToast()
+  const [perm, setPerm] = useState(() => ('Notification' in window ? Notification.permission : 'denied'))
+  const [add, setAdd] = useState('18:00')
+  const save = (next: ReminderSettings) => setSetting('reminders', { ...next, times: [...new Set(next.times)].sort() })
+  const enable = async () => {
+    let p = perm
+    if ('Notification' in window && p === 'default') { p = await Notification.requestPermission(); setPerm(p) }
+    save({ ...r, on: true })
+  }
+  const test = async () => {
+    const m = reminderMessage() ?? { title: 'All set for today', body: 'Protein and calories are covered. Reminders will show like this.' }
+    if (!(await notifyNow(m.title, m.body))) toast({ title: m.title, body: m.body })
+  }
+  return (
+    <Section title="Reminders" sub="Nudges like “You've still got 40 g of protein left!” at the times you pick. They show while the app is open or running in the background.">
+      <div className="row wrap" style={{ gap: 10, marginBottom: r.on ? 14 : 0 }}>
+        <Segmented value={r.on ? 'on' : 'off'} onChange={(v) => (v === 'on' ? enable() : save({ ...r, on: false }))} options={[{ value: 'off', label: 'Off' }, { value: 'on', label: 'On' }]} />
+        {r.on && <Button variant="ghost" onClick={test}><Bell size={14} /> Send a test</Button>}
+      </div>
+      {r.on && (
+        <>
+          <div className="row wrap" style={{ gap: 6, marginBottom: 12 }}>
+            {r.times.map((t) => (
+              <span key={t} className="chip-btn on" style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                {fmtTime(t)}
+                <button aria-label={`Remove ${t}`} onClick={() => save({ ...r, times: r.times.filter((x) => x !== t) })} style={{ display: 'grid' }}><X size={12} /></button>
+              </span>
+            ))}
+          </div>
+          <div className="row" style={{ gap: 8 }}>
+            <input className="input num" type="time" value={add} onChange={(e) => setAdd(e.target.value)} style={{ width: 140 }} />
+            <Button onClick={() => add && save({ ...r, times: [...r.times, add] })}><Plus size={14} /> Add time</Button>
+          </div>
+          {perm === 'denied' && <p className="t-xs" style={{ color: 'var(--warn)', marginTop: 10 }}>Notifications are blocked for this app, so reminders show inside the app only. Allow notifications in your phone or browser settings to get pop-ups.</p>}
+          {!platform.isDesktop && <p className="t-xs muted" style={{ marginTop: 10 }}>On iPhone, reminders reach you while Forma is open or in the app switcher. If you close it fully, you'll see it the next time you open the app.</p>}
+        </>
+      )}
+    </Section>
+  )
+}
+const fmtTime = (t: string) => { const [h, m] = t.split(':').map(Number); return `${((h + 11) % 12) + 1}:${String(m).padStart(2, '0')} ${h < 12 ? 'AM' : 'PM'}` }
 
 function PhotoCard() {
   const t = useTargets()!

@@ -97,6 +97,17 @@ export async function notify(title: string, body: string) {
   } catch { /* notifications unavailable */ }
 }
 
+/** Shows a notification now, even with the app open. Returns false when notifications aren't allowed. */
+export async function notifyNow(title: string, body: string, tag = 'forma-reminder') {
+  try {
+    if (!('Notification' in window) || Notification.permission !== 'granted') return false
+    const reg = await navigator.serviceWorker?.getRegistration()
+    if (reg) await reg.showNotification(title, { body, tag, icon: './icon-192.png' })
+    else new Notification(title, { body, tag })
+    return true
+  } catch { return false }
+}
+
 export function askNotifyPermission() {
   try { if ('Notification' in window && Notification.permission === 'default') void Notification.requestPermission() } catch { /* unsupported */ }
 }

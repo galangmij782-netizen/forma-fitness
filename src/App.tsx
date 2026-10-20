@@ -4,7 +4,9 @@ import { useCallback, useEffect, useState } from 'react'
 import { CelebrateProvider } from './components/Celebrate'
 import { RestTimerProvider } from './components/RestTimer'
 import { UpdateBanner } from './components/UpdateBanner'
-import { ToastProvider, spring } from './components/ui'
+import { ToastProvider, spring, useToast } from './components/ui'
+import { notifyNow } from './lib/alarm'
+import { useReminders } from './lib/reminders'
 import { closeDatabase, flush, useDbReady, useQuery } from './lib/db'
 import { NavCtx, SessionCtx, useSession, type PageKey } from './lib/nav'
 import { platform, type ProfileInfo } from './lib/platform'
@@ -81,6 +83,7 @@ export default function App() {
               <ToastProvider>
                 <CelebrateProvider>
                   <RestTimerProvider>
+                    <ReminderRunner />
                     <Shell />
                   </RestTimerProvider>
                 </CelebrateProvider>
@@ -91,6 +94,18 @@ export default function App() {
       </AnimatePresence>
     </MotionConfig>
   )
+}
+
+/** Shows nutrition reminders: a system notification when the app is in the background, a toast when it's in front. */
+function ReminderRunner() {
+  const { profileId } = useSession()
+  const toast = useToast()
+  const show = useCallback((m: { title: string; body: string }) => {
+    if (document.hidden) void notifyNow(m.title, m.body)
+    else toast({ title: m.title, body: m.body })
+  }, [toast])
+  useReminders(profileId, show)
+  return null
 }
 
 function Shell() {
