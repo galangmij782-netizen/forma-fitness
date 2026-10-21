@@ -22,6 +22,12 @@ describe('coach', () => {
     expect(ids).toEqual(expect.arrayContaining(['drinks', 'alcohol', 'sodium']))
     expect(tips.find((t) => t.id === 'sodium')!.detail).not.toMatch(/Champorado/)
   })
+  it('does not mistake gin-, rum- or wine-starting dishes for alcohol', () => {
+    const tips = coachDay({ ...base, meals: [meal('Lunch', [item('Ginisang sayote', 70, 3, 6), item('Ginataang gulay', 150, 3, 10), item('Ginger tea', 20, 0, 5)])] })
+    expect(tips.map((t) => t.id)).not.toContain('alcohol')
+    const drunk = coachDay({ ...base, meals: [meal('Night', [item('Ginebra gin', 200, 0, 0), item('Red Horse beers', 300, 2, 20)])] })
+    expect(drunk.map((t) => t.id)).toContain('alcohol')
+  })
   it('praises a good meal note', () => {
     expect(mealNote([item('Chicken breast', 330, 62)])).toMatch(/62 g protein/)
     expect(mealNote([item('White rice', 400, 8, 88)])).toMatch(/Only 8 g/)

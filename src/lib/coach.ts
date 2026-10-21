@@ -12,10 +12,10 @@ export interface CoachTip {
   why: string
 }
 
-const has = (name: string, words: string[]) => { const n = name.toLowerCase(); return words.some((w) => new RegExp(`\\b${w.replace(/[-]/g, '\\-')}`).test(n)) }
+const has = (name: string, words: string[], whole = false) => { const n = name.toLowerCase(); return words.some((w) => new RegExp(`\\b${w.replace(/[-]/g, '\\-')}${whole ? 's?\\b' : ''}`).test(n)) }
 const PRODUCE = ['banana', 'saging', 'apple', 'orange', 'mango', 'papaya', 'pineapple', 'watermelon', 'grape', 'berr', 'avocado', 'broccoli', 'spinach', 'kangkong', 'lettuce', 'salad', 'tomato', 'cucumber', 'carrot', 'vegetable', 'veggie', 'gulay', 'chop suey', 'pinakbet', 'saba', 'fruit', 'monggo', 'sinigang', 'tinola']
 const SUGARY_DRINKS = ['soda', 'coke', 'cola', 'sprite', 'royal', 'pepsi', 'milk tea', 'boba', 'juice', '3-in-1', 'softdrink']
-const ALCOHOL = ['beer', 'wine', 'san miguel', 'red horse', 'vodka', 'whisky', 'rum', 'gin', 'tequila', 'cocktail']
+const ALCOHOL = ['beer', 'wine', 'san miguel', 'red horse', 'vodka', 'whisky', 'rum', 'gin', 'ginebra', 'emperador', 'brandy', 'tequila', 'cocktail', 'soju', 'alfonso']
 const SALTY = ['tocino', 'longganisa', 'hotdog', 'hot dog', 'corned beef', 'luncheon', 'spam', 'ham', 'bacon', 'instant noodle', 'pancit canton', 'chips', 'tapa', 'silog', 'sardines', 'soy sauce']
 const FRIED = ['fried', 'lechon', 'chicharon', 'fries', 'chickenjoy', 'turon', 'lumpia', 'sisig', 'donut', 'kawali', 'bagnet']
 
@@ -104,7 +104,7 @@ export function coachDay(opts: { meals: Meal[]; targets: Targets; phase: Phase; 
   }
 
   // 7. Alcohol
-  const alcohol = items.filter((i) => has(i.name, ALCOHOL))
+  const alcohol = items.filter((i) => has(i.name, ALCOHOL, true))
   if (alcohol.length) {
     tips.push({ id: 'alcohol', tone: 'warn', title: 'Alcohol logged', detail: `${alcohol.map((a) => a.name).join(', ')}. Keep it to 1 to 2 drinks and drink water alongside.`, why: 'Alcohol blunts muscle protein synthesis and disrupts deep sleep, the two things recovery depends on most.' })
   }
