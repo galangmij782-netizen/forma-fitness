@@ -26,7 +26,7 @@ jobs:
         continue-on-error: true
         run: |
           mkdir -p assets && cp public/icon-512.png assets/icon-only.png && cp public/icon-512.png assets/icon-foreground.png
-          convert -size 512x512 xc:'#0b0c0e' assets/icon-background.png
+          python3 -c "import zlib,struct;w=512;c=lambda t,d:struct.pack('>I',len(d))+t+d+struct.pack('>I',zlib.crc32(t+d));open('assets/icon-background.png','wb').write(b'\\x89PNG\\r\\n\\x1a\\n'+c(b'IHDR',struct.pack('>IIBBBBB',w,w,8,2,0,0,0))+c(b'IDAT',zlib.compress((b'\\x00'+bytes([11,12,14])*w)*w))+c(b'IEND',b''))"
           npx --yes @capacitor/assets@3 generate --android --splashBackgroundColor '#0b0c0e'
       - run: npx cap sync android
       - run: cd android && ./gradlew assembleRelease --no-daemon
