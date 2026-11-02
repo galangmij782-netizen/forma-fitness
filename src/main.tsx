@@ -5,9 +5,11 @@ import './styles.css'
 
 document.documentElement.dataset.theme = 'dark'
 document.documentElement.dataset.accent = 'green'
+const androidApp = !!(window as { Capacitor?: { isNativePlatform?: () => boolean } }).Capacitor?.isNativePlatform?.()
 document.documentElement.dataset.platform = window.forma ? 'desktop' : 'web'
 
-if (!window.forma && import.meta.env.PROD && 'serviceWorker' in navigator) {
+// The Android app ships its files inside the APK, so it needs no service worker.
+if (!window.forma && !androidApp && import.meta.env.PROD && 'serviceWorker' in navigator) {
   navigator.serviceWorker.register('./sw.js').catch(() => {})
   // Ask the browser not to evict this device's data (Safari honours this for installed apps).
   navigator.storage?.persist?.().catch(() => {})

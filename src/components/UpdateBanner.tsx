@@ -6,12 +6,15 @@ import { softSpring } from './ui'
 declare const __BUILD__: string
 const SITE = 'https://galangmij782-netizen.github.io/forma-fitness/'
 const DOWNLOAD = 'https://github.com/galangmij782-netizen/forma-fitness/releases/latest'
+const APK = 'https://github.com/galangmij782-netizen/forma-fitness/releases/download/android/Forma.apk'
+const isAndroidApp = () => !!(window as { Capacitor?: { isNativePlatform?: () => boolean } }).Capacitor?.isNativePlatform?.()
 
 /** Checks for a newer build when the app opens, when it comes back to the foreground, and every 15 minutes. */
 export function UpdateBanner() {
   const [newer, setNewer] = useState(false)
   const [hidden, setHidden] = useState(false)
-  const desktop = !!window.forma
+  const android = isAndroidApp()
+  const desktop = !!window.forma || android
   useEffect(() => {
     if (import.meta.env.DEV || location.search.includes('demo')) return
     let stop = false
@@ -32,7 +35,7 @@ export function UpdateBanner() {
   }, [desktop])
 
   const update = async () => {
-    if (desktop) { window.open(DOWNLOAD); return }
+    if (desktop) { window.open(android ? APK : DOWNLOAD); return }
     try { const reg = await navigator.serviceWorker?.getRegistration(); await reg?.update() } catch { /* ignore */ }
     location.reload()
   }

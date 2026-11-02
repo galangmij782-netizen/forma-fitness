@@ -1,0 +1,6 @@
+{
+  "appId": "app.forma.fitness",
+  "appName": "Forma",
+  "webDir": "dist",
+  "android": { "backgroundColor": "#0b0b0c" }
+}

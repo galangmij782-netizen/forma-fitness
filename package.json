@@ -57,6 +57,9 @@
     "sql.js": "^1.15.0"
   },
   "devDependencies": {
+    "@capacitor/android": "^7.6.10",
+    "@capacitor/cli": "^7.6.10",
+    "@capacitor/core": "^7.6.10",
     "@types/react": "^18.3.31",
     "@types/react-dom": "^18.3.7",
     "@types/sql.js": "^1.4.11",

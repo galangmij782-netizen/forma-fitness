@@ -1,0 +1,61 @@
+name: Android app
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: npm }
+      - uses: actions/setup-java@v4
+        with: { distribution: temurin, java-version: 21 }
+      - run: npm ci
+      - run: npm test
+      - run: npm run build
+      - run: npx cap add android
+      # The barcode scanner needs the camera; reminders need notifications.
+      - run: |
+          sed -i 's#<uses-permission android:name="android.permission.INTERNET" />#&\n    <uses-permission android:name="android.permission.CAMERA" />\n    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />\n    <uses-feature android:name="android.hardware.camera" android:required="false" />#' android/app/src/main/AndroidManifest.xml
+          grep -n permission android/app/src/main/AndroidManifest.xml
+      - name: App icon
+        continue-on-error: true
+        run: |
+          mkdir -p assets && cp public/icon-512.png assets/icon-only.png && cp public/icon-512.png assets/icon-foreground.png
+          npx --yes @capacitor/assets@3 generate --android --iconBackgroundColor '#0b0c0e' --splashBackgroundColor '#0b0c0e'
+      - run: npx cap sync android
+      - run: cd android && ./gradlew assembleRelease --no-daemon
+      # The signing key never goes in the repo. It comes from the ANDROID_KEYSTORE secret when set,
+      # otherwise from a key this workflow made once and keeps in the Actions cache, so every APK
+      # carries the same signature and installs over the previous one.
+      - uses: actions/cache@v4
+        with: { path: signing, key: forma-android-keystore-v1 }
+      - name: Sign
+        env:
+          KEYSTORE_B64: ${{ secrets.ANDROID_KEYSTORE }}
+          KEY_PASS: ${{ secrets.ANDROID_KEY_PASS }}
+        run: |
+          PASS="${KEY_PASS:-forma-android}"
+          mkdir -p signing
+          if [ -n "$KEYSTORE_B64" ]; then echo "$KEYSTORE_B64" | base64 -d > signing/forma.keystore
+          elif [ ! -f signing/forma.keystore ]; then
+            keytool -genkeypair -keystore signing/forma.keystore -alias forma -keyalg RSA -keysize 2048 -validity 10000 -storepass "$PASS" -keypass "$PASS" -dname "CN=Forma, O=Forma, C=PH"
+          fi
+          BT=$(ls -d $ANDROID_HOME/build-tools/* | sort -V | tail -1)
+          $BT/zipalign -f 4 android/app/build/outputs/apk/release/app-release-unsigned.apk aligned.apk
+          $BT/apksigner sign --ks signing/forma.keystore --ks-pass "pass:$PASS" --key-pass "pass:$PASS" --ks-key-alias forma --out Forma.apk aligned.apk
+          $BT/apksigner verify Forma.apk
+      - uses: actions/upload-artifact@v4
+        with: { name: Forma-Android, path: Forma.apk }
+      # A fixed "android" release keeps one download link that always has the newest APK.
+      - uses: softprops/action-gh-release@v2
+        with:
+          tag_name: android
+          name: Forma for Android
+          make_latest: false
+          body: Open this page on your Android phone, tap Forma.apk, then open the download and tap Install. If asked, allow installs from your browser. New versions install over the old one and keep your data.
+          files: Forma.apk
